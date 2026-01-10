@@ -37,31 +37,10 @@ ifeq ($(CONFIG_static),no)
  LIBTCC=libtcc$(DLLSUF)
  export LD_LIBRARY_PATH := $(CURDIR)/$(TOP)
  ifneq ($(CONFIG_rpath),no)
-   ifndef CONFIG_OSX
-     LINK_LIBTCC += -Wl,-rpath,"$(libdir)"
-   else
-     # macOS doesn't support env-vars libdir out of the box - which we need for
-     # `make test' when libtcc.dylib is used (configure --disable-static), so
-     # we bake a relative path into the binary. $libdir is used after install.
-     LINK_LIBTCC += -Wl,-rpath,"@executable_path/$(TOP)" -Wl,-rpath,"$(libdir)"
-     # -current/compatibility_version must not contain letters.
-     MACOS_DYLIB_VERSION := $(firstword $(subst rc, ,$(VERSION)))
-     DYLIBVER += -current_version $(MACOS_DYLIB_VERSION)
-     DYLIBVER += -compatibility_version $(MACOS_DYLIB_VERSION)
-   endif
+   LINK_LIBTCC += -Wl,-rpath,"$(libdir)"
  endif
 endif
 NATIVE_TARGET = $(ARCH)
-ifdef CONFIG_OSX
- NATIVE_TARGET = $(ARCH)-osx
- ifneq ($(CC_NAME),tcc)
-   LDFLAGS += -flat_namespace
-   ifneq (1,$(shell expr $(GCC_MAJOR) ">=" 15))
-     LDFLAGS += -undefined warning # depreciated in clang >= 15.0
-   endif
- endif
- export MACOSX_DEPLOYMENT_TARGET := 10.6
-endif
 
 # run local version of tcc with local libraries and includes
 TCCFLAGS-unx = -B$(TOP) -I$(TOPSRC)/include -I$(TOPSRC) -I$(TOP)
@@ -83,7 +62,6 @@ LDFLAGS_P = $(LDFLAGS)
 DEF-i386           = -DTCC_TARGET_I386
 DEF-i386-OpenBSD   = $(DEF-i386) -DTARGETOS_OpenBSD
 DEF-x86_64         = -DTCC_TARGET_X86_64
-DEF-x86_64-osx     = -DTCC_TARGET_X86_64 -DTCC_TARGET_MACHO
 DEF-arm-fpa        = -DTCC_TARGET_ARM
 DEF-arm-fpa-ld     = -DTCC_TARGET_ARM -DLDOUBLE_SIZE=12
 DEF-arm-vfp        = -DTCC_TARGET_ARM -DTCC_ARM_VFP
@@ -92,7 +70,6 @@ DEF-arm-eabihf     = $(DEF-arm-eabi) -DTCC_ARM_HARDFLOAT
 DEF-arm            = $(DEF-arm-eabihf)
 DEF-arm-NetBSD     = $(DEF-arm-eabihf) -DTARGETOS_NetBSD
 DEF-arm64          = -DTCC_TARGET_ARM64
-DEF-arm64-osx      = $(DEF-arm64) -DTCC_TARGET_MACHO
 DEF-arm64-FreeBSD  = $(DEF-arm64) -DTARGETOS_FreeBSD
 DEF-arm64-NetBSD   = $(DEF-arm64) -DTARGETOS_NetBSD
 DEF-arm64-OpenBSD  = $(DEF-arm64) -DTARGETOS_OpenBSD
@@ -113,8 +90,8 @@ TCCDOCS = tcc.1 tcc-doc.html tcc-doc.info
 all: $(PROGS) $(TCCLIBS) $(TCCDOCS)
 
 # cross compiler targets to build
-TCC_X = i386 x86_64 x86_64-osx arm arm64 c67
-TCC_X += riscv64 arm64-osx
+TCC_X = i386 x86_64 arm arm64 c67
+TCC_X += riscv64
 # TCC_X += arm-fpa arm-fpa-ld arm-vfp arm-eabi
 
 # cross libtcc1.a targets to build
@@ -181,7 +158,6 @@ CORE_FILES = tcc.c tcctools.c libtcc.c tccpp.c tccgen.c tccdbg.c tccelf.c tccasm
 CORE_FILES += tcc.h config.h libtcc.h tcctok.h
 i386_FILES = $(CORE_FILES) i386-gen.c i386-link.c i386-asm.c i386-asm.h i386-tok.h
 x86_64_FILES = $(CORE_FILES) x86_64-gen.c x86_64-link.c i386-asm.c x86_64-asm.h
-x86_64-osx_FILES = $(x86_64_FILES) tccmacho.c
 arm_FILES = $(CORE_FILES) arm-gen.c arm-link.c arm-asm.c arm-tok.h
 arm-eabihf_FILES = $(arm_FILES)
 arm-fpa_FILES     = $(arm_FILES)
@@ -190,7 +166,6 @@ arm-vfp_FILES     = $(arm_FILES)
 arm-eabi_FILES    = $(arm_FILES)
 arm-eabihf_FILES  = $(arm_FILES)
 arm64_FILES = $(CORE_FILES) arm64-gen.c arm64-link.c arm64-asm.c
-arm64-osx_FILES = $(arm64_FILES) tccmacho.c
 c67_FILES = $(CORE_FILES) c67-gen.c c67-link.c tcccoff.c
 riscv64_FILES = $(CORE_FILES) riscv64-gen.c riscv64-link.c riscv64-asm.c
 
@@ -280,13 +255,6 @@ libtcc.so: $(LIBTCC_OBJ)
 libtcc.so: override CFLAGS += -fPIC
 libtcc.so: override LDFLAGS += -fPIC
 
-# OSX dynamic libtcc library
-libtcc.dylib: $(LIBTCC_OBJ)
-	$S$(CC) -dynamiclib $(DYLIBVER) -install_name @rpath/$@ -o $@ $^ $(LDFLAGS) 
-
-# OSX libtcc.dylib (without rpath/ prefix)
-libtcc.osx: $(LIBTCC_OBJ)
-	$S$(CC) -shared -install_name libtcc.dylib -o libtcc.dylib $^ $(LDFLAGS) 
 
 # TinyCC runtime libraries
 libtcc1.a : tcc$(EXESUF) FORCE
@@ -355,7 +323,7 @@ install-unx:
 # uninstall
 uninstall-unx:
 	@rm -fv $(addprefix "$(bindir)/",$(PROGS) $(PROGS_CROSS))
-	@rm -fv $(addprefix "$(libdir)/", libtcc*.a libtcc*.so libtcc.dylib)
+	@rm -fv $(addprefix "$(libdir)/", libtcc*.a libtcc*.so)
 	@rm -fv $(addprefix "$(includedir)/", libtcc.h)
 	@rm -fv "$(mandir)/man1/tcc.1" "$(infodir)/tcc-doc.info"
 	@rm -fv "$(docdir)/tcc-doc.html"
@@ -409,7 +377,7 @@ test-install: $(TCCDEFS_H)
 clean:
 	@rm -f tcc *-tcc tcc_p tcc_c tcc_s
 	@rm -f tags ETAGS *.o *.a *.so* *.out *.log
-	@rm -f a.out *.dylib *_.h *.pod *.tcov
+	@rm -f a.out *_.h *.pod *.tcov
 	@$(MAKE) -s -C lib $@
 	@$(MAKE) -s -C tests $@
 
