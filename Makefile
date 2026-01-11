@@ -62,13 +62,6 @@ LDFLAGS_P = $(LDFLAGS)
 DEF-i386           = -DTCC_TARGET_I386
 DEF-i386-OpenBSD   = $(DEF-i386) -DTARGETOS_OpenBSD
 DEF-x86_64         = -DTCC_TARGET_X86_64
-DEF-arm-fpa        = -DTCC_TARGET_ARM
-DEF-arm-fpa-ld     = -DTCC_TARGET_ARM -DLDOUBLE_SIZE=12
-DEF-arm-vfp        = -DTCC_TARGET_ARM -DTCC_ARM_VFP
-DEF-arm-eabi       = -DTCC_TARGET_ARM -DTCC_ARM_VFP -DTCC_ARM_EABI
-DEF-arm-eabihf     = $(DEF-arm-eabi) -DTCC_ARM_HARDFLOAT
-DEF-arm            = $(DEF-arm-eabihf)
-DEF-arm-NetBSD     = $(DEF-arm-eabihf) -DTARGETOS_NetBSD
 DEF-arm64          = -DTCC_TARGET_ARM64
 DEF-arm64-FreeBSD  = $(DEF-arm64) -DTARGETOS_FreeBSD
 DEF-arm64-NetBSD   = $(DEF-arm64) -DTARGETOS_NetBSD
@@ -90,9 +83,8 @@ TCCDOCS = tcc.1 tcc-doc.html tcc-doc.info
 all: $(PROGS) $(TCCLIBS) $(TCCDOCS)
 
 # cross compiler targets to build
-TCC_X = i386 x86_64 arm arm64 c67
+TCC_X = i386 x86_64 arm64 c67
 TCC_X += riscv64
-# TCC_X += arm-fpa arm-fpa-ld arm-vfp arm-eabi
 
 # cross libtcc1.a targets to build
 LIBTCC1_X = $(filter-out c67,$(TCC_X))
@@ -143,7 +135,6 @@ ifneq ($(T),$(NATIVE_TARGET))
 # assume support files for cross-targets in "/usr/<triplet>" by default
 TRIPLET-i386 ?= i686-linux-gnu
 TRIPLET-x86_64 ?= x86_64-linux-gnu
-TRIPLET-arm ?= arm-linux-gnueabi
 TRIPLET-arm64 ?= aarch64-linux-gnu
 TRIPLET-riscv64 ?= riscv64-linux-gnu
 MARCH-i386 ?= i386-linux-gnu
@@ -158,13 +149,6 @@ CORE_FILES = tcc.c tcctools.c libtcc.c tccpp.c tccgen.c tccdbg.c tccelf.c tccasm
 CORE_FILES += tcc.h config.h libtcc.h tcctok.h
 i386_FILES = $(CORE_FILES) i386-gen.c i386-link.c i386-asm.c i386-asm.h i386-tok.h
 x86_64_FILES = $(CORE_FILES) x86_64-gen.c x86_64-link.c i386-asm.c x86_64-asm.h
-arm_FILES = $(CORE_FILES) arm-gen.c arm-link.c arm-asm.c arm-tok.h
-arm-eabihf_FILES = $(arm_FILES)
-arm-fpa_FILES     = $(arm_FILES)
-arm-fpa-ld_FILES  = $(arm_FILES)
-arm-vfp_FILES     = $(arm_FILES)
-arm-eabi_FILES    = $(arm_FILES)
-arm-eabihf_FILES  = $(arm_FILES)
 arm64_FILES = $(CORE_FILES) arm64-gen.c arm64-link.c arm64-asm.c
 c67_FILES = $(CORE_FILES) c67-gen.c c67-link.c tcccoff.c
 riscv64_FILES = $(CORE_FILES) riscv64-gen.c riscv64-link.c riscv64-asm.c
