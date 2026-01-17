@@ -42,12 +42,8 @@ int main()
    printf("%f %f %f %f\n", 12.34f + 56.78f, 12.34f - 56.78f, 12.34f * 56.78f, 12.34f / 56.78f);
    printf("%g %g %g %g\n", 12.34 + 56.78, 12.34 - 56.78, 12.34 * 56.78, 12.34 / 56.78);
    printf("%Lf %Lf %Lf %Lf\n", 12.34l + 56.78l, 12.34l - 56.78l, 12.34l * 56.78l, 12.34l / 56.78l);
-#ifdef __i386__
-   // gcc/clang -m32 -mno-sse and tcc all fail for + and * but all have the same value
-   printf("%f %f %f %f\n", 12.34f + 56.78f, f1 - f2, 12.34f * 56.78f, f1 / f2);
-#else
    printf("%f %f %f %f\n", f1 + f2, f1 - f2, f1 * f2, f1 / f2);
-#endif
+
    printf("%g %g %g %g\n", d1 + d2, d1 - d2, d1 * d2, d1 / d2);
    printf("%Lf %Lf %Lf %Lf\n", ld1 + ld2, ld1 - ld2, ld1 * ld2, ld1 / ld2);
 
@@ -76,13 +72,9 @@ int main()
    af = 12.34f; ad = 12.34; ald = 12.34l;
    af += 56.78f; ad += 56.78; ald += 56.78l;
    printf("%f %g %Lf\n", af, ad, ald);
-#ifdef __i386__
-   printf("%f %g %Lf\n", af, ad, ald);
-#else
    af = f1; ad = d1; ald = ld1;
    af += f2; ad += d2; ald += ld2;
    printf("%f %g %Lf\n", af, ad, ald);
-#endif
 
    af = 12.34f; ad = 12.34; ald = 12.34l;
    af -= 56.78f; ad -= 56.78; ald -= 56.78l;
@@ -94,14 +86,11 @@ int main()
    af = 12.34f; ad = 12.34; ald = 12.34l;
    af *= 56.78f; ad *= 56.78; ald *= 56.78l;
    printf("%f %g %Lf\n", af, ad, ald);
-#ifdef __i386__
-   printf("%f %g %Lf\n", af, ad, ald);
-#else
    af = f1; ad = d1; ald = ld1;
    af *= f2; ad *= d2; ald *= ld2;
    printf("%f %g %Lf\n", af, ad, ald);
-#endif
 
+   
    af = 12.34f; ad = 12.34; ald = 12.34l;
    af /= 56.78f; ad /= 56.78; ald /= 56.78l;
    printf("%f %g %Lf\n", af, ad, ald);

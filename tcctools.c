@@ -327,16 +327,6 @@ the_end:
 
 /* re-execute the i386/x86_64 cross-compilers with tcc -m32/-m64: */
 
-#if !defined TCC_TARGET_I386 && !defined TCC_TARGET_X86_64
-
-ST_FUNC int tcc_tool_cross(char **argv, int option)
-{
-    fprintf(stderr, "tcc -m%d not implemented\n", option);
-    return 1;
-}
-
-#else
-
 ST_FUNC int tcc_tool_cross(char **argv, int target)
 {
     char program[4096];
@@ -353,8 +343,6 @@ ST_FUNC int tcc_tool_cross(char **argv, int target)
     fprintf(stderr, "tcc: could not run '%s'\n", program);
     return 1;
 }
-
-#endif /* TCC_TARGET_I386 && TCC_TARGET_X86_64 */
 
 /* -------------------------------------------------------------- */
 /* generate xxx.d file */

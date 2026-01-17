@@ -3267,7 +3267,6 @@ void local_label_test(void)
 }
 
 /* inline assembler test */
-#if defined(__i386__) || defined(__x86_64__)
 
 typedef __SIZE_TYPE__ word;
 
@@ -3840,14 +3839,6 @@ void asm_test(void)
     goto label2;
 }
 
-#else
-
-void asm_test(void)
-{
-}
-
-#endif
-
 #define COMPAT_TYPE(type1, type2) \
 {\
     printf("__builtin_types_compatible_p(%s, %s) = %d\n", #type1, #type2, \
@@ -4315,7 +4306,6 @@ void bounds_check1_test (void)
     pv(y);
 }
 
-/* This failed on arm64/riscv64 */
 void map_add(int a, int b, int c, int d, int e, int f, int g, int h, int i)
 {
   printf ("%d %d %d %d %d %d %d %d %d\n", a, b, c, d, e, f, g, h, i);

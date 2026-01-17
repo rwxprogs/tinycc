@@ -182,15 +182,7 @@ LIBTCCAPI int tcc_run(TCCState *s1, int argc, char **argv)
     const char *top_sym;
     jmp_buf main_jb;
 
-#if defined(__APPLE__)
-    extern char ***_NSGetEnviron(void);
-    char **envp = *_NSGetEnviron();
-#elif defined(__OpenBSD__) || defined(__NetBSD__)  || defined(__FreeBSD__)
-    extern char **environ;
     char **envp = environ;
-#else
-    char **envp = environ;
-#endif
 
     /* tcc -dt -run ... nothing to do if no main() */
     if ((s1->dflag & 16) && (addr_t)-1 == get_sym_addr(s1, "main", 0, 1))
@@ -301,13 +293,9 @@ static int tcc_relocate_ex(TCCState *s1, void *ptr, unsigned ptr_diff)
 
     if (NULL == ptr) {
         s1->nb_errors = 0;
-#ifdef TCC_TARGET_PE
-        pe_output_file(s1, NULL);
-#else
         tcc_add_runtime(s1);
-	resolve_common_syms(s1);
+    	resolve_common_syms(s1);
         build_got_entries(s1, 0);
-#endif
     }
 
     offset = copy = 0;
@@ -353,13 +341,12 @@ redo:
 
             align = s->sh_addralign;
             if (++n == 1) {
-#if defined TCC_TARGET_I386 || defined TCC_TARGET_X86_64
                 /* To avoid that x86 processors would reload cached instructions
                    each time when data is written in the near, we need to make
                    sure that code and data do not share the same 64 byte unit */
                 if (align < 64)
                     align = 64;
-#endif
+
                 /* start new page for different permissions */
                 if (k <= CONFIG_RUNMEM_RO)
                     align = PAGESIZE;
@@ -413,11 +400,7 @@ redo:
     /* relocate symbols */
     relocate_syms(s1, s1->symtab, 1);
     /* relocate sections */
-#ifdef TCC_TARGET_PE
-    s1->pe_imagebase = mem;
-#else
     relocate_plt(s1);
-#endif
     relocate_sections(s1);
     goto redo;
 }
@@ -952,9 +935,6 @@ check_pc:
 #else
 		        pc = dwarf_read_8(cp, end);
 #endif
-#if defined TCC_TARGET_MACHO
-			pc += rc->prog_base;
-#endif
 		        opindex = 0;
 		        break;
 		    case DW_LNE_define_file: /* deprecated */
@@ -1241,7 +1221,6 @@ static void set_exception_handler(void)
 
 /* ------------------------------------------------------------- */
 /* return the PC at frame level 'level'. Return negative if not found */
-#if defined(__i386__) || defined(__x86_64__)
 static int rt_get_caller_pc(addr_t *paddr, rt_frame *rc, int level)
 {
     if (level == 0) {
@@ -1261,33 +1240,6 @@ static int rt_get_caller_pc(addr_t *paddr, rt_frame *rc, int level)
     return 0;
 }
 
-#elif defined(__aarch64__)
-static int rt_get_caller_pc(addr_t *paddr, rt_frame *rc, int level)
-{
-    if (level == 0) {
-        *paddr = rc->ip;
-    } else {
-        addr_t fp = rc->fp;
-        while (1) {
-            if (fp < 0x1000)
-                return -1;
-            if (0 == --level)
-                break;
-            fp = ((addr_t *)fp)[0];
-        }
-        *paddr = ((addr_t *)fp)[1];
-    }
-    return 0;
-}
-
-#else
-#warning add arch specific rt_get_caller_pc()
-static int rt_get_caller_pc(addr_t *paddr, rt_frame *rc, int level)
-{
-    return -1;
-}
-
-#endif
 #else // for runmain.c:exit(); when CONFIG_TCC_BACKTRACE == 0 */
 static int rt_get_caller_pc(addr_t *paddr, rt_frame *f, int level)
 {

@@ -2521,8 +2521,6 @@ typedef Elf32_Addr Elf32_Conflict;
 /* Keep this the last entry.  */
 #define R_ARM_NUM		256
 
-/* TMS320C67xx specific declarations */
-
 /* XXX: no ELF standard yet*/
 
 /* TMS320C67xx relocs. */

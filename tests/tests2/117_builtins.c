@@ -86,9 +86,7 @@ main (void)
   __builtin_memset(p, 0, 100);
   __builtin_free(p);
 
-#if defined(__i386__) || defined(__x86_64__)
   p = __builtin_alloca(100);
   __builtin_memset(p, 0, 100);
-#endif
   printf("\n");
 }

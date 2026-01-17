@@ -82,13 +82,6 @@ ST_FUNC void tccelf_new(TCCState *s)
         lbounds_section = new_section(s, ".lbounds", SHT_PROGBITS, shf_RELRO);
     }
 #endif
-
-#ifdef TCC_TARGET_PE
-    /* to make sure that -ltcc1 -Wl,-e,_start will grab the startup code
-       from libtcc1.a (unless _start defined) */
-    if (s->elf_entryname)
-        set_global_sym(s, s->elf_entryname, NULL, 0); /* SHN_UNDEF */
-#endif
 }
 
 ST_FUNC void free_section(Section *s)
@@ -137,10 +130,6 @@ ST_FUNC void tccelf_begin_file(TCCState *s1)
     }
     /* disable symbol hashing during compilation */
     s = s1->symtab, s->reloc = s->hash, s->hash = NULL;
-#if defined TCC_TARGET_X86_64 && defined TCC_TARGET_PE
-    s1->uw_sym = 0;
-    s1->uw_offs = 0;
-#endif
 }
 
 static void update_relocs(TCCState *s1, Section *s, int *old_to_new_syms, int first_sym);
@@ -166,13 +155,12 @@ ST_FUNC void tccelf_end_file(TCCState *s1)
             int sym_type = ELFW(ST_TYPE)(sym->st_info);
             if (sym_bind == STB_LOCAL)
                 sym_bind = STB_GLOBAL;
-#ifndef TCC_TARGET_PE
             if (sym_bind == STB_GLOBAL && s1->output_type == TCC_OUTPUT_OBJ) {
                 /* undefined symbols with STT_FUNC are confusing gnu ld when
                    linking statically to STT_GNU_IFUNC */
                 sym_type = STT_NOTYPE;
             }
-#endif
+
             sym->st_info = ELFW(ST_INFO)(sym_bind, sym_type);
         }
         tr[i] = set_elf_sym(s, sym->st_value, sym->st_size, sym->st_info,
@@ -478,12 +466,7 @@ ST_FUNC addr_t get_sym_addr(TCCState *s1, const char *name, int err, int forc)
     int sym_index;
     ElfW(Sym) *sym;
     char buf[256];
-    if (forc && s1->leading_underscore
-#ifdef TCC_TARGET_PE
-        /* win32-32bit stdcall symbols always have _ already */
-        && !strchr(name, '@')
-#endif
-        ) {
+    if (forc && s1->leading_underscore) {
         buf[0] = '_';
         pstrcpy(buf + 1, sizeof(buf) - 1, name);
         name = buf;
@@ -507,11 +490,6 @@ LIBTCCAPI void *tcc_get_symbol(TCCState *s, const char *name)
 
 LIBTCCAPI int tcc_add_symbol(TCCState *s1, const char *name, const void *val)
 {
-#ifdef TCC_TARGET_PE
-    /* On x86_64 'val' might not be reachable with a 32bit offset.
-       So it is handled here as if it were in a DLL. */
-    pe_putimport(s1, 0, name, (uintptr_t)val);
-#else
     char buf[256];
     if (s1->leading_underscore) {
         buf[0] = '_';
@@ -519,7 +497,7 @@ LIBTCCAPI int tcc_add_symbol(TCCState *s1, const char *name, const void *val)
         name = buf;
     }
     set_global_sym(s1, name, NULL, (addr_t)(uintptr_t)val); /* NULL: SHN_ABS */
-#endif
+
     return 0;
 }
 
@@ -1052,7 +1030,6 @@ ST_FUNC void relocate_syms(TCCState *s1, Section *symtab, int do_resolve)
             name = (char *) s1->symtab->link->data + sym->st_name;
             /* Use ld.so to resolve symbol for us (for tcc -run) */
             if (do_resolve) {
-#if defined TCC_IS_NATIVE && !defined TCC_TARGET_PE
                 /* dlsym() needs the undecorated name.  */
                 const char *name_ud = &name[s1->leading_underscore];
                 void *addr = NULL;
@@ -1071,7 +1048,6 @@ ST_FUNC void relocate_syms(TCCState *s1, Section *symtab, int do_resolve)
 #endif
                     goto found;
                 }
-#endif
             /* if dynamic symbol exist, it will be used in relocate_section */
             } else if (s1->dynsym && find_elf_sym(s1->dynsym, name))
                 goto found;
@@ -1157,26 +1133,21 @@ ST_FUNC void relocate_sections(TCCState *s1)
         if (sr->sh_type != SHT_RELX)
             continue;
         s = s1->sections[sr->sh_info];
-#ifndef TCC_TARGET_MACHO
         if (s != s1->got
             || s1->static_link
             || s1->output_type == TCC_OUTPUT_MEMORY)
-#endif
         {
             relocate_section(s1, s, sr);
         }
-#ifndef ELF_OBJ_ONLY
         if (sr->sh_flags & SHF_ALLOC) {
             ElfW_Rel *rel;
             /* relocate relocation table in 'sr' */
             for_each_elem(sr, 0, rel, ElfW_Rel)
                 rel->r_offset += s->sh_addr;
         }
-#endif
     }
 }
 
-#ifndef ELF_OBJ_ONLY
 /* count the number of dynamic relocations so that we can reserve
    their space */
 static int prepare_dynamic_rel(TCCState *s1, Section *sr)
@@ -1216,7 +1187,6 @@ static int prepare_dynamic_rel(TCCState *s1, Section *sr)
     }
     return count;
 }
-#endif
 
 #ifdef NEED_BUILD_GOT
 static int build_got(TCCState *s1)
@@ -1396,29 +1366,15 @@ redo:
                 } else if (sym->st_shndx == SHN_ABS) {
                     if (sym->st_value == 0) /* from tcc_add_btstub() */
                         continue;
-#ifndef TCC_TARGET_ARM
                     if (PTR_SIZE != 8)
                         continue;
-#endif
+
                     /* from tcc_add_symbol(): on 64 bit platforms these
                        need to go through .got */
                 } else
                     continue;
             }
 
-#ifdef TCC_TARGET_I386
-            if ((type == R_386_PLT32 || type == R_386_PC32) &&
-		sym->st_shndx != SHN_UNDEF &&
-                (ELFW(ST_VISIBILITY)(sym->st_other) != STV_DEFAULT ||
-		 ELFW(ST_BIND)(sym->st_info) == STB_LOCAL ||
-		 s1->output_type & TCC_OUTPUT_EXE)) {
-		if (pass != 0)
-		    continue;
-                rel->r_info = ELFW(R_INFO)(sym_index, R_386_PC32);
-                continue;
-            }
-#endif
-#ifdef TCC_TARGET_X86_64
             if ((type == R_X86_64_PLT32 || type == R_X86_64_PC32) &&
 		sym->st_shndx != SHN_UNDEF &&
                 (ELFW(ST_VISIBILITY)(sym->st_other) != STV_DEFAULT ||
@@ -1429,7 +1385,7 @@ redo:
                 rel->r_info = ELFW(R_INFO)(sym_index, R_X86_64_PC32);
                 continue;
             }
-#endif
+
             reloc_type = code_reloc(type);
             if (reloc_type == -1) {
                 tcc_error_noabort ("Unknown relocation type: %d", type);
@@ -1586,12 +1542,7 @@ ST_FUNC void tcc_add_btstub(TCCState *s1)
     } else {
         /* prog_base : local nameless symbol with offset 0 at SHN_ABS */
         put_ptr(s1, NULL, 0);
-#if defined TCC_TARGET_MACHO
-        /* adjust for __PAGEZERO */
-        if (s1->dwarf == 0 && s1->output_type == TCC_OUTPUT_EXE)
-            write64le(data_section->data + data_section->data_offset - PTR_SIZE,
-	              (uint64_t)1 << 32);
-#endif
+
     }
     n = 3 * PTR_SIZE;
 #ifdef CONFIG_TCC_BCHECK
@@ -1616,14 +1567,6 @@ ST_FUNC void tcc_add_btstub(TCCState *s1)
         "extern void __bt_init(),__bt_exit(),__bt_init_dll();"
         "static void *__rt_info[];"
         "__attribute__((constructor)) static void __bt_init_rt(){");
-#ifdef TCC_TARGET_PE
-    if (s1->output_type == TCC_OUTPUT_DLL)
-#ifdef CONFIG_TCC_BCHECK
-        cstr_printf(&cstr, "__bt_init_dll(%d);", s1->do_bounds_check);
-#else
-        cstr_printf(&cstr, "__bt_init_dll(0);");
-#endif
-#endif
     cstr_printf(&cstr, "__bt_init(__rt_info,%d);}",
         s1->output_type != TCC_OUTPUT_DLL);
     /* In case dlcose is called by application */
@@ -1675,64 +1618,17 @@ static void tcc_tcov_add_file(TCCState *s1, const char *filename)
 /* add libc crt1/crti objects */
 ST_FUNC void tccelf_add_crtbegin(TCCState *s1)
 {
-#if TARGETOS_OpenBSD
-    if (s1->output_type != TCC_OUTPUT_DLL)
-        tcc_add_crt(s1, "crt0.o");
-    if (s1->output_type == TCC_OUTPUT_DLL)
-        tcc_add_crt(s1, "crtbeginS.o");
-    else
-        tcc_add_crt(s1, "crtbegin.o");
-#elif TARGETOS_FreeBSD || TARGETOS_NetBSD
-    if (s1->output_type != TCC_OUTPUT_DLL)
-#if TARGETOS_FreeBSD
-        tcc_add_crt(s1, "crt1.o");
-#else
-        tcc_add_crt(s1, "crt0.o");
-#endif
-    tcc_add_crt(s1, "crti.o");
-    if (s1->static_link)
-        tcc_add_crt(s1, "crtbeginT.o");
-    else if (s1->output_type == TCC_OUTPUT_DLL)
-        tcc_add_crt(s1, "crtbeginS.o");
-    else
-        tcc_add_crt(s1, "crtbegin.o");
-#elif TARGETOS_ANDROID
-    if (s1->output_type == TCC_OUTPUT_DLL)
-        tcc_add_crt(s1, "crtbegin_so.o");
-    else
-        tcc_add_crt(s1, "crtbegin_dynamic.o");
-#else
     if (s1->output_type != TCC_OUTPUT_DLL)
         tcc_add_crt(s1, "crt1.o");
     tcc_add_crt(s1, "crti.o");
-#endif
 }
 
 ST_FUNC void tccelf_add_crtend(TCCState *s1)
 {
-#if TARGETOS_OpenBSD
-    if (s1->output_type == TCC_OUTPUT_DLL)
-        tcc_add_crt(s1, "crtendS.o");
-    else
-        tcc_add_crt(s1, "crtend.o");
-#elif TARGETOS_FreeBSD || TARGETOS_NetBSD
-    if (s1->output_type == TCC_OUTPUT_DLL)
-        tcc_add_crt(s1, "crtendS.o");
-    else
-        tcc_add_crt(s1, "crtend.o");
     tcc_add_crt(s1, "crtn.o");
-#elif TARGETOS_ANDROID
-    if (s1->output_type == TCC_OUTPUT_DLL)
-        tcc_add_crt(s1, "crtend_so.o");
-    else
-        tcc_add_crt(s1, "crtend_android.o");
-#else
-    tcc_add_crt(s1, "crtn.o");
-#endif
 }
 #endif /* TCC_TARGET_UNIX */
 
-#ifndef TCC_TARGET_PE
 /* add tcc runtime libraries */
 ST_FUNC void tcc_add_runtime(TCCState *s1)
 {
@@ -1750,9 +1646,7 @@ ST_FUNC void tcc_add_runtime(TCCState *s1)
 #ifdef CONFIG_TCC_BCHECK
         if (s1->do_bounds_check && s1->output_type != TCC_OUTPUT_DLL) {
             tcc_add_support(s1, "bcheck.o");
-# if !(TARGETOS_OpenBSD || TARGETOS_NetBSD)
             tcc_add_library(s1, "dl");
-# endif
             lpthread = 1;
         }
 #endif
@@ -1777,18 +1671,14 @@ ST_FUNC void tcc_add_runtime(TCCState *s1)
                 tcc_add_dll(s1, TCC_LIBGCC, AFF_PRINT_ERROR);
         }
 #endif
-#if defined TCC_TARGET_ARM && TARGETOS_FreeBSD
-        tcc_add_library(s1, "gcc_s"); // unwind code
-#endif
         if (TCC_LIBTCC1[0])
             tcc_add_support(s1, TCC_LIBTCC1);
-#ifndef TCC_TARGET_MACHO
+
         if (s1->output_type != TCC_OUTPUT_MEMORY)
             tccelf_add_crtend(s1);
-#endif
+
     }
 }
-#endif /* ndef TCC_TARGET_PE */
 
 /* add various standard linker symbols (must be done after the
    sections are filled (for example after allocating common
@@ -1802,13 +1692,6 @@ static void tcc_add_linker_symbols(TCCState *s1)
     set_global_sym(s1, "_etext", text_section, -1);
     set_global_sym(s1, "_edata", data_section, -1);
     set_global_sym(s1, "_end", bss_section, -1);
-#if TARGETOS_OpenBSD
-    set_global_sym(s1, "__executable_start", NULL, ELF_START_ADDR);
-#endif
-#ifdef TCC_TARGET_RISCV64
-    /* XXX should be .sdata+0x800, not .data+0x800 */
-    set_global_sym(s1, "__global_pointer$", data_section, 0x800);
-#endif
     /* horrible new standard ldscript defines */
     add_init_array_defines(s1, ".preinit_array");
     add_init_array_defines(s1, ".init_array");
@@ -2088,11 +1971,7 @@ static int set_sec_sizes(TCCState *s1)
                         textrel += count;
                 }
             }
-        } else if ((s->sh_flags & SHF_ALLOC)
-#ifdef TCC_TARGET_ARM
-                   || s->sh_type == SHT_ARM_ATTRIBUTES
-#endif
-                   || s1->do_debug) {
+        } else if ((s->sh_flags & SHF_ALLOC) || s1->do_debug) {
             s->sh_size = s->data_offset;
         }
     }
@@ -2212,15 +2091,8 @@ static int sort_sections(TCCState *s1, int *sec_order, struct dyn_inf *d)
             ++d->shnum;
         if (k < 0x700) {
             f = s->sh_flags & (SHF_ALLOC|SHF_WRITE|SHF_EXECINSTR|SHF_TLS);
-#if TARGETOS_NetBSD
-	    /* NetBSD only supports 2 PT_LOAD sections.
-	       See: https://blog.netbsd.org/tnf/entry/the_first_report_on_lld */
-	    if ((f & SHF_WRITE) == 0)
-                f |= SHF_EXECINSTR;
-#else
             if ((k & 0xfff0) == 0x240) /* RELRO sections */
                 f |= 1<<4;
-#endif
             /* start new header when flags changed or relro, but avoid zero memsz */
             if (f != f0 && s->sh_size)
                 f0 = f, ++n, f |= 1<<8;
@@ -2547,23 +2419,6 @@ static int tcc_output_elf(TCCState *s1, FILE *f, int phnum, ElfW(Phdr) *phdr)
     ehdr.e_ident[5] = ELFDATA2LSB;
     ehdr.e_ident[6] = EV_CURRENT;
 
-#if TARGETOS_FreeBSD || TARGETOS_FreeBSD_kernel
-    ehdr.e_ident[EI_OSABI] = ELFOSABI_FREEBSD;
-#elif TARGETOS_OpenBSD
-    ehdr.e_ident[EI_OSABI] = ELFOSABI_OPENBSD;
-#elif TARGETOS_NetBSD
-    ehdr.e_ident[EI_OSABI] = ELFOSABI_NETBSD;
-#elif defined TCC_TARGET_ARM && defined TCC_ARM_EABI
-    ehdr.e_flags = EF_ARM_EABI_VER5;
-    ehdr.e_flags |= s1->float_abi == ARM_HARD_FLOAT
-        ? EF_ARM_VFP_FLOAT : EF_ARM_SOFT_FLOAT;
-#elif defined TCC_TARGET_ARM
-    ehdr.e_ident[EI_OSABI] = ELFOSABI_ARM;
-#elif defined TCC_TARGET_RISCV64
-    /* XXX should be configurable */
-    ehdr.e_flags = EF_RISCV_FLOAT_ABI_DOUBLE;
-#endif
-
     if (file_type == TCC_OUTPUT_OBJ) {
         ehdr.e_type = ET_REL;
     } else {
@@ -2677,11 +2532,6 @@ static int tcc_write_elf_file(TCCState *s1, const char *filename, int phnum,
         return tcc_error_noabort("could not write '%s: %s'", filename, strerror(errno));
     if (s1->verbose)
         printf("<- %s\n", filename);
-#ifdef TCC_TARGET_COFF
-    if (s1->output_format == TCC_OUTPUT_FORMAT_COFF)
-        tcc_output_coff(s1, f);
-    else
-#endif
     if (s1->output_format == TCC_OUTPUT_FORMAT_ELF)
         ret = tcc_output_elf(s1, f, phnum, phdr);
     else
@@ -2729,105 +2579,6 @@ static void reorder_sections(TCCState *s1, int *sec_order)
     tcc_free(backmap);
 }
 
-#ifdef TCC_TARGET_ARM
-static void create_arm_attribute_section(TCCState *s1)
-{
-   // Needed for DLL support.
-    static const unsigned char arm_attr[] = {
-        0x41,                            // 'A'
-        0x2c, 0x00, 0x00, 0x00,          // size 0x2c
-        'a', 'e', 'a', 'b', 'i', 0x00,   // "aeabi"
-        0x01, 0x22, 0x00, 0x00, 0x00,    // 'File Attributes', size 0x22
-        0x05, 0x36, 0x00,                // 'CPU_name', "6"
-#if CONFIG_TCC_CPUVER >= 7
-        0x06, 0x0a,                      // 'CPU_arch', 'v7'
-#else
-        0x06, 0x06,                      // 'CPU_arch', 'v6'
-#endif
-        0x08, 0x01,                      // 'ARM_ISA_use', 'Yes'
-        0x09, 0x01,                      // 'THUMB_ISA_use', 'Thumb-1'
-        0x0a, 0x02,                      // 'FP_arch', 'VFPv2'
-        0x12, 0x04,                      // 'ABI_PCS_wchar_t', 4
-        0x14, 0x01,                      // 'ABI_FP_denormal', 'Needed'
-        0x15, 0x01,                      // 'ABI_FP_exceptions', 'Needed'
-        0x17, 0x03,                      // 'ABI_FP_number_model', 'IEEE 754'
-        0x18, 0x01,                      // 'ABI_align_needed', '8-byte'
-        0x19, 0x01,                      // 'ABI_align_preserved', '8-byte, except leaf SP'
-        0x1a, 0x02,                      // 'ABI_enum_size', 'int'
-        0x1c, 0x01,                      // 'ABI_VFP_args', 'VFP registers'
-        0x22, 0x01                       // 'CPU_unaligned_access', 'v6'
-    };
-    Section *attr = new_section(s1, ".ARM.attributes", SHT_ARM_ATTRIBUTES, 0);
-    unsigned char *ptr = section_ptr_add(attr, sizeof(arm_attr));
-    attr->sh_addralign = 1;
-    memcpy(ptr, arm_attr, sizeof(arm_attr));
-    if (s1->float_abi != ARM_HARD_FLOAT) {
-        ptr[26] = 0x00; // 'FP_arch', 'No'
-        ptr[41] = 0x1e; // 'ABI_optimization_goals'
-        ptr[42] = 0x06; // 'Aggressive Debug'
-    }
-}
-#endif
-
-#if TARGETOS_OpenBSD || TARGETOS_NetBSD || TARGETOS_FreeBSD
-
-static void fill_bsd_note(Section *s, int type,
-			  const char *value, uint32_t data)
-{
-    unsigned long offset = 0;
-    char *ptr;
-    ElfW(Nhdr) *note;
-    int align = s->sh_addralign;
-
-    /* check if type present */
-    while (offset + sizeof(ElfW(Nhdr)) < s->data_offset) {
-        note = (ElfW(Nhdr) *) (s->data + offset);
-	if (note->n_type == type)
-	    return;
-	offset += (sizeof(ElfW(Nhdr)) + note->n_namesz + note->n_descsz +
-		  align - 1) & -align;
-    }
-    ptr = section_ptr_add(s, sizeof(ElfW(Nhdr)) + 8 + 4);
-    note = (ElfW(Nhdr) *) ptr;
-    note->n_namesz = 8;
-    note->n_descsz = 4;
-    note->n_type = type;
-    strcpy (ptr + sizeof(ElfW(Nhdr)), value);
-    memcpy (ptr + sizeof(ElfW(Nhdr)) + 8, &data, 4);
-}
-
-static Section *create_bsd_note_section(TCCState *s1,
-					const char *name,
-					const char *value)
-{
-    Section *s;
-    unsigned int major = 0, minor = 0, patch = 0;
-
-#ifdef CONFIG_OS_RELEASE
-    sscanf(CONFIG_OS_RELEASE, "%u.%u.%u", &major, &minor, &patch);
-#endif
-#if TARGETOS_FreeBSD
-    if (major < 14)
-	return NULL;
-#endif
-    s = find_section (s1, name);
-    s->sh_type = SHT_NOTE;
-#if TARGETOS_OpenBSD
-    fill_bsd_note(s, ELF_NOTE_OS_GNU, value, 0);
-#elif TARGETOS_NetBSD
-    fill_bsd_note(s, 1 /* NT_NETBSD_IDENT_TAG */, value,
-		  major * 100000000u + (minor % 100u) * 1000000u +
-		  (patch % 10000u) * 100u);
-#elif TARGETOS_FreeBSD
-    fill_bsd_note(s, 1 /* NT_FREEBSD_ABI_TAG */, value,
-		  major * 100000u + (minor % 100u) * 1000u);
-    fill_bsd_note(s, 4 /* NT_FREEBSD_FEATURE_CTL */, value, 0);
-    fill_bsd_note(s, 2 /* NT_FREEBSD_NOINIT_TAG */, value, 0);
-#endif
-    return s;
-}
-#endif
-
 static void alloc_sec_names(TCCState *s1, int is_obj);
 
 /* Output an elf, coff or binary file */
@@ -2844,26 +2595,6 @@ static int elf_output_file(TCCState *s1, const char *filename)
     interp = dynstr = dynamic = NULL;
     sec_order = NULL;
     dyninf.roinf = &dyninf._roinf;
-
-#ifdef TCC_TARGET_ARM
-    create_arm_attribute_section (s1);
-#endif
-
-#if TARGETOS_OpenBSD
-    dyninf.note = create_bsd_note_section (s1, ".note.openbsd.ident", "OpenBSD");
-#endif
-
-#if TARGETOS_NetBSD
-    dyninf.note = create_bsd_note_section (s1, ".note.netbsd.ident", "NetBSD");
-#endif
-
-#if TARGETOS_FreeBSD
-    dyninf.note = create_bsd_note_section (s1, ".note.tag", "FreeBSD");
-#endif
-
-#if TARGETOS_FreeBSD || TARGETOS_NetBSD
-    dyninf.roinf = NULL;
-#endif
 
         /* if linking, also link in runtime libraries (libc, libgcc, etc.) */
         tcc_add_runtime(s1);
@@ -3060,13 +2791,8 @@ LIBTCCAPI int tcc_output_file(TCCState *s, const char *filename)
         tcc_tcov_add_file(s, filename);
     if (s->output_type == TCC_OUTPUT_OBJ)
         return elf_output_obj(s, filename);
-#ifdef TCC_TARGET_PE
-    return  pe_output_file(s, filename);
-#elif defined TCC_TARGET_MACHO
-    return macho_output_file(s, filename);
-#else
+
     return elf_output_file(s, filename);
-#endif
 }
 
 ST_FUNC ssize_t full_read(int fd, void *buf, size_t count) {
@@ -3109,10 +2835,6 @@ ST_FUNC int tcc_object_type(int fd, ElfW(Ehdr) *h)
     } else if (size >= 8) {
         if (0 == memcmp(h, ARMAG, 8))
             return AFF_BINTYPE_AR;
-#ifdef TCC_TARGET_COFF
-        if (((struct filehdr*)h)->f_magic == COFF_C67_MAGIC)
-            return AFF_BINTYPE_C67;
-#endif
     }
     return 0;
 }
@@ -3196,30 +2918,16 @@ invalid:
          || 0 == strncmp(sh_name, ".stab", 5)) {
 	    if (!s1->do_debug || seencompressed)
 	        continue;
-#if !(TARGETOS_OpenBSD || TARGETOS_FreeBSD || TARGETOS_NetBSD)
         } else if (0 == strncmp(sh_name, ".eh_frame", 9)) {
             if (NULL == eh_frame_section)
                 continue;
-#endif
         } else
         if (sh->sh_type != SHT_PROGBITS &&
             sh->sh_type != SHT_NOTE &&
             sh->sh_type != SHT_NOBITS &&
             sh->sh_type != SHT_PREINIT_ARRAY &&
             sh->sh_type != SHT_INIT_ARRAY &&
-            sh->sh_type != SHT_FINI_ARRAY
-#ifdef TCC_ARM_EABI
-            /* Added in commit f99d3de221db23e322c6c18c8249282e27726c25
-               but suppressed in 3cfaaaf1eb97d858e583412616f68f75fdad5da5
-               So don't load it in order to avoid dangling references from
-               (STT_SECTION) symbols. */
-            // && sh->sh_type != SHT_ARM_EXIDX
-#endif
-
-#if TARGETOS_OpenBSD || TARGETOS_FreeBSD || TARGETOS_NetBSD
-            && sh->sh_type != SHT_X86_64_UNWIND
-#endif
-            )
+            sh->sh_type != SHT_FINI_ARRAY)
             continue;
 
 	sh = &shdr[i];
@@ -3373,14 +3081,7 @@ invalid:
                     goto invalid_reloc;
                 sym_index = old_to_new_syms[sym_index];
                 /* ignore link_once in rel section. */
-                if (!sym_index && !sm_table[sh->sh_info].link_once
-#ifdef TCC_TARGET_ARM
-                    && type != R_ARM_V4BX
-#elif defined TCC_TARGET_RISCV64
-                    && type != R_RISCV_ALIGN
-                    && type != R_RISCV_RELAX
-#endif
-                   ) {
+                if (!sym_index && !sm_table[sh->sh_info].link_once) {
                 invalid_reloc:
                     tcc_error_noabort("Invalid relocation entry [%2d] '%s' @ %.8x",
                         i, strsec + sh->sh_name, (int)rel->r_offset);
@@ -3389,18 +3090,6 @@ invalid:
                 rel->r_info = ELFW(R_INFO)(sym_index, type);
                 /* offset the relocation offset */
                 rel->r_offset += offseti;
-#ifdef TCC_TARGET_ARM
-                /* Jumps and branches from a Thumb code to a PLT entry need
-                   special handling since PLT entries are ARM code.
-                   Unconditional bl instructions referencing PLT entries are
-                   handled by converting these instructions into blx
-                   instructions. Other case of instructions referencing a PLT
-                   entry require to add a Thumb stub before the PLT entry to
-                   switch to ARM mode. We set bit plt_thumb_stub of the
-                   attribute of a symbol to indicate such a case. */
-                if (type == R_ARM_THM_JUMP24)
-                    get_sym_attr(s1, sym_index, 1)->plt_thumb_stub = 1;
-#endif
             }
             break;
         default:

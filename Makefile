@@ -136,7 +136,8 @@ x86_64_FILES = $(CORE_FILES) x86_64-gen.c x86_64-link.c x86_64-asm.c x86_64-asm.
 TCCDEFS_H$(subst yes,,$(CONFIG_predefs)) = tccdefs_.h
 
 # libtcc sources
-LIBTCC_SRC = $(filter-out tcc.c tcctools.c,$(filter %.c,$($T_FILES)))
+#LIBTCC_SRC = $(filter-out tcc.c tcctools.c,$(filter %.c,$($T_FILES)))
+LIBTCC_SRC = libtcc.c tccpp.c tccgen.c tccdbg.c tccelf.c tccasm.c tccrun.c x86_64-gen.c x86_64-link.c x86_64-asm.c
 
 ifeq ($(ONE_SOURCE),yes)
 LIBTCC_OBJ = $(X)libtcc.o

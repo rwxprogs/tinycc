@@ -24,14 +24,7 @@
 #include <setjmp.h>
 #include <stdatomic.h>
 
-#if !defined(__FreeBSD__) \
- && !defined(__FreeBSD_kernel__) \
- && !defined(__DragonFly__) \
- && !defined(__OpenBSD__) \
- && !defined(__APPLE__) \
- && !defined(__NetBSD__)
 #include <malloc.h>
-#endif
 
 #include <unistd.h>
 #include <sys/syscall.h>
@@ -79,7 +72,7 @@ static pthread_spinlock_t bounds_spin;
 #define HAVE_SIGNAL            (1)
 #define HAVE_SIGACTION         (1)
 #define HAVE_FORK              (1)
-#if !defined(__APPLE__) && defined(__GNUC__) && (defined(__i386__) || defined(__x86_64__))
+#if defined(__GNUC__)
 #define HAVE_TLS_FUNC          (0)
 #define HAVE_TLS_VAR           (1)
 #else
@@ -624,13 +617,7 @@ void __bound_new_region(void *p, size_t size)
     last = NULL;
     cur = alloca_list;
     while (cur) {
-#if defined(__i386__) || (defined(__arm__) && !defined(__ARM_EABI__))
-        int align = 4;
-#elif defined(__arm__)
-        int align = 8;
-#else
         int align = 16;
-#endif
         void *cure = (void *)((char *)cur->p + ((cur->size + align) & -align));
         void *pe = (void *)((char *)p + ((size + align) & -align));
         if (cur->fp == fp && ((cur->p <= p && cure > p) ||

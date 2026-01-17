@@ -18,13 +18,8 @@
 
 #if __SIZEOF_POINTER__ == 4
     /* 32bit systems. */
-#if defined  __OpenBSD__
-    #define __SIZE_TYPE__ unsigned long
-    #define __PTRDIFF_TYPE__ long
-#else
     #define __SIZE_TYPE__ unsigned int
     #define __PTRDIFF_TYPE__ int
-#endif
     #define __ILP32__ 1
     #define __INT64_TYPE__ long long
 #elif __SIZEOF_LONG__ == 4
@@ -38,11 +33,7 @@
     #define __SIZE_TYPE__ unsigned long
     #define __PTRDIFF_TYPE__ long
     #define __LP64__ 1
-# if defined __linux__
     #define __INT64_TYPE__ long
-# else /* APPLE, BSD */
-    #define __INT64_TYPE__ long long
-# endif
 #endif
     #define __SIZEOF_INT__ 4
     #define __INT_MAX__ 0x7fffffff

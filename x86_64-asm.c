@@ -1631,15 +1631,7 @@ ST_FUNC void asm_gen_code(ASMOperand *operands, int nb_operands,
 
     /* Strictly speaking %Xbp and %Xsp should be included in the
        call-preserved registers, but currently it doesn't matter.  */
-#ifdef TCC_TARGET_X86_64
-#ifdef TCC_TARGET_PE
-    static const uint8_t reg_saved[] = { 3, 6, 7, 12, 13, 14, 15 };
-#else
     static const uint8_t reg_saved[] = { 3, 12, 13, 14, 15 };
-#endif
-#else
-    static const uint8_t reg_saved[] = { 3, 6, 7 };
-#endif
 
     /* mark all used registers */
     memcpy(regs_allocated, clobber_regs, sizeof(regs_allocated));
