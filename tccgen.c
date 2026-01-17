@@ -3152,9 +3152,6 @@ op_err:
         gv(is_float(vtop->type.t & VT_BTYPE) ? RC_FLOAT : RC_INT);
 }
 
-#if defined TCC_TARGET_ARM64 || defined TCC_TARGET_RISCV64 || defined TCC_TARGET_ARM
-#define gen_cvt_itof1 gen_cvt_itof
-#else
 /* generic itof for unsigned long long case */
 static void gen_cvt_itof1(int t)
 {
@@ -3177,11 +3174,7 @@ static void gen_cvt_itof1(int t)
         gen_cvt_itof(t);
     }
 }
-#endif
 
-#if defined TCC_TARGET_ARM64 || defined TCC_TARGET_RISCV64
-#define gen_cvt_ftoi1 gen_cvt_ftoi
-#else
 /* generic ftoi for unsigned long long case */
 static void gen_cvt_ftoi1(int t)
 {
@@ -3205,7 +3198,6 @@ static void gen_cvt_ftoi1(int t)
         gen_cvt_ftoi(t);
     }
 }
-#endif
 
 /* special delayed cast for char/short */
 static void force_charshort_cast(void)
@@ -3434,9 +3426,7 @@ error:
             /* RISC-V keeps 32bit vals in registers sign-extended.
                So here we need a sign-extension for signed types and
                zero-extension. for unsigned types. */
-#if !defined(TCC_TARGET_RISCV64)
             trunc = 32; /* zero upper 32 bits for non RISC-V targets */
-#endif
         } else {
             ss = 4;
         }
@@ -3444,12 +3434,12 @@ error:
 
         if (ds >= ss)
             goto done;
-#if defined TCC_TARGET_I386 || defined TCC_TARGET_X86_64 || defined TCC_TARGET_ARM64
+
         if (ss == 4) {
             gen_cvt_csti(dbt);
             goto done;
         }
-#endif
+
         bits = (ss - ds) * 8;
         /* for unsigned, gen_op will convert SAR to SHR */
         vtop->type.t = (ss == 8 ? VT_LLONG : VT_INT) | (dbt & VT_UNSIGNED);
@@ -5904,33 +5894,6 @@ ST_FUNC void unary(void)
 #endif
 #endif
 
-#ifdef TCC_TARGET_ARM64
-    case TOK_builtin_va_start: {
-	parse_builtin_params(0, "ee");
-        //xx check types
-        gen_va_start();
-        vpushi(0);
-        vtop->type.t = VT_VOID;
-        break;
-    }
-    case TOK_builtin_va_arg: {
-	parse_builtin_params(0, "et");
-	type = vtop->type;
-	vpop();
-        //xx check types
-        gen_va_arg(&type);
-        vtop->type = type;
-        break;
-    }
-    case TOK___arm64_clear_cache: {
-	parse_builtin_params(0, "ee");
-        gen_clear_cache();
-        vpushi(0);
-        vtop->type.t = VT_VOID;
-        break;
-    }
-#endif
-
     /* atomic operations */
     case TOK___atomic_store:
     case TOK___atomic_load:
@@ -6190,15 +6153,6 @@ special_math_val:
                 if (ret_nregs <= 0) {
                     /* get some space for the returned structure */
                     size = type_size(&s->type, &align);
-#ifdef TCC_TARGET_ARM64
-                /* On arm64, a small struct is return in registers.
-                   It is much easier to write it to memory if we know
-                   that we are allowed to write some extra bytes, so
-                   round the allocated space up to a power of 2: */
-                if (size < 16)
-                    while (size & (size - 1))
-                        size = (size | (size - 1)) + 1;
-#endif
                     loc = (loc - size) & -align;
                     ret.type = s->type;
                     ret.r = VT_LOCAL | VT_LVAL;
@@ -6757,7 +6711,6 @@ ST_FUNC int expr_const(void)
 /* ------------------------------------------------------------------------- */
 /* return from function */
 
-#ifndef TCC_TARGET_ARM64
 static void gfunc_return(CType *func_type)
 {
     if ((func_type->t & VT_BTYPE) == VT_STRUCT) {
@@ -6765,11 +6718,7 @@ static void gfunc_return(CType *func_type)
         int ret_align, ret_nregs, regsize;
         ret_nregs = gfunc_sret(func_type, func_var, &ret_type,
                                &ret_align, &regsize);
-        if (ret_nregs < 0) {
-#ifdef TCC_TARGET_RISCV64
-            arch_transfer_ret_regs(0);
-#endif
-        } else if (0 == ret_nregs) {
+        if (0 == ret_nregs) {
             /* if returning structure, must copy it to implicit
                first pointer arg location */
             type = *func_type;
@@ -6822,7 +6771,6 @@ static void gfunc_return(CType *func_type)
     }
     vtop--; /* NOT vpop() because on x86 it would flush the fp stack */
 }
-#endif
 
 static void check_func_return(void)
 {

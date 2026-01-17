@@ -1151,7 +1151,7 @@ void char_short_test()
     var4 = 0x11223344aa998877ULL;
     printf("promote char/short assign VA %d %d\n", var3 = var1 + 1, var3 = var4 + 1);
     printf("promote char/short cast VA %d %d\n", (signed char)(var1 + 1), (signed char)(var4 + 1));
-#if !defined(__arm__)
+
     /* We can't really express GCC behaviour of return type promotion in
        the presence of undefined behaviour (like __csf is).  */
     var1 = csf(unsigned char,0x89898989);
@@ -1166,7 +1166,7 @@ void char_short_test()
         csf(short,0xefefefef),
         csf(_Bool,0x33221100),
         csf(_Bool,0x33221101));
-#endif
+
     var3 = -10;
     var1 = (signed char)(unsigned char)(var3 + 1);
     var4 = (signed char)(unsigned char)(var3 + 1);

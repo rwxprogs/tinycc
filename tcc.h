@@ -70,10 +70,6 @@ extern long double strtold (const char *__nptr, char **__endptr);
 /* assembler debug */
 /* #define ASM_DEBUG */
 
-/* target selection */
-/* #define TCC_TARGET_X86_64 *//* x86-64 code generator */
-/* #define TCC_TARGET_ARM64  *//* ARMv8 code generator */
-
 /* only native compiler supports -run */
 #define TCC_IS_NATIVE
 
@@ -170,18 +166,8 @@ extern long double strtold (const char *__nptr, char **__endptr);
 #ifndef CONFIG_TCC_ELFINTERP
 # if defined __GNU__
 #  define CONFIG_TCC_ELFINTERP "/lib/ld.so"
-# elif defined(TCC_TARGET_PE)
-#  define CONFIG_TCC_ELFINTERP "-"
-# elif defined TCC_TARGET_ARM64
-#  define CONFIG_TCC_ELFINTERP "/lib/ld-linux-aarch64.so.1"
 # elif defined(TCC_TARGET_X86_64)
 #  define CONFIG_TCC_ELFINTERP "/lib64/ld-linux-x86-64.so.2"
-# elif defined(TCC_TARGET_RISCV64)
-#  define CONFIG_TCC_ELFINTERP "/lib/ld-linux-riscv64-lp64d.so.1"
-# elif defined(TCC_ARM_EABI)
-#  define DEFAULT_ELFINTERP(s) default_elfinterp(s)
-# else
-#  define CONFIG_TCC_ELFINTERP "/lib/ld-linux.so.2"
 # endif
 #endif
 
@@ -241,16 +227,8 @@ extern long double strtold (const char *__nptr, char **__endptr);
 /* include the target specific definitions */
 
 #define TARGET_DEFS_ONLY
-#if defined TCC_TARGET_X86_64
-# include "x86_64-gen.c"
-# include "x86_64-link.c"
-#elif defined TCC_TARGET_ARM64
-# include "arm64-gen.c"
-# include "arm64-link.c"
-# include "arm64-asm.c"
-#else
-#error unknown target
-#endif
+#include "x86_64-gen.c"
+#include "x86_64-link.c"
 #undef TARGET_DEFS_ONLY
 
 /* -------------------------------------------- */
@@ -1485,18 +1463,6 @@ ST_FUNC void gen_addr64(int r, Sym *sym, int64_t c);
 ST_FUNC void gen_opl(int op);
 ST_FUNC void gen_cvt_sxtw(void);
 ST_FUNC void gen_cvt_csti(int t);
-#endif
-
-/* ------------ arm64-gen.c ------------ */
-#ifdef TCC_TARGET_ARM64
-ST_FUNC void gen_opl(int op);
-ST_FUNC void gfunc_return(CType *func_type);
-ST_FUNC void gen_va_start(void);
-ST_FUNC void gen_va_arg(CType *t);
-ST_FUNC void gen_clear_cache(void);
-ST_FUNC void gen_cvt_sxtw(void);
-ST_FUNC void gen_cvt_csti(int t);
-ST_FUNC void gen_increment_tcov (SValue *sv);
 #endif
 
 /* ------------ tccasm.c ------------ */

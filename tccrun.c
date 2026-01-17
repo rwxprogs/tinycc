@@ -435,12 +435,7 @@ static int protect_pages(void *ptr, unsigned long length, int mode)
         };
     if (mprotect(ptr, length, protect[mode]))
         return -1;
-#ifdef TCC_TARGET_ARM64
-    if (mode == 0 || mode == 3) {
-        void __clear_cache(void *beginning, void *end);
-        __clear_cache(ptr, (char *)ptr + length);
-    }
-#endif
+
     return 0;
 }
 

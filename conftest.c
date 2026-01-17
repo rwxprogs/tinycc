@@ -9,7 +9,6 @@
 /* replace native host macros by compile-time versions */
 const char *platform_macros[] = {
     "__x86_64__",           "TCC_TARGET_X86_64",
-    "__aarch64__",          "TCC_TARGET_ARM64",
     "__linux__",            "TARGETOS_Linux",
 
     "__SIZEOF_POINTER__",   "PTR_SIZE",

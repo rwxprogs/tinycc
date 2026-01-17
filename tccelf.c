@@ -1182,52 +1182,17 @@ ST_FUNC void relocate_sections(TCCState *s1)
 static int prepare_dynamic_rel(TCCState *s1, Section *sr)
 {
     int count = 0;
-#if defined(TCC_TARGET_I386) || defined(TCC_TARGET_X86_64) || \
-    defined(TCC_TARGET_ARM) || defined(TCC_TARGET_ARM64) || \
-    defined(TCC_TARGET_RISCV64)
+
     ElfW_Rel *rel;
     for_each_elem(sr, 0, rel, ElfW_Rel) {
         int sym_index = ELFW(R_SYM)(rel->r_info);
         int type = ELFW(R_TYPE)(rel->r_info);
         switch(type) {
-#if defined(TCC_TARGET_I386)
-        case R_386_32:
-            if (!get_sym_attr(s1, sym_index, 0)->dyn_index
-                && ((ElfW(Sym)*)symtab_section->data + sym_index)->st_shndx == SHN_UNDEF) {
-                /* don't fixup unresolved (weak) symbols */
-                rel->r_info = ELFW(R_INFO)(sym_index, R_386_RELATIVE);
-                break;
-            }
-#elif defined(TCC_TARGET_X86_64)
         case R_X86_64_32:
         case R_X86_64_32S:
         case R_X86_64_64:
-#elif defined(TCC_TARGET_ARM)
-        case R_ARM_ABS32:
-        case R_ARM_TARGET1:
-#elif defined(TCC_TARGET_ARM64)
-        case R_AARCH64_ABS32:
-        case R_AARCH64_ABS64:
-#elif defined(TCC_TARGET_RISCV64)
-        case R_RISCV_32:
-        case R_RISCV_64:
-#endif
             count++;
             break;
-#if defined(TCC_TARGET_I386)
-        case R_386_PC32:
-	{
-	    ElfW(Sym) *sym = &((ElfW(Sym) *)symtab_section->data)[sym_index];
-            /* Hidden defined symbols can and must be resolved locally.
-               We're misusing a PLT32 reloc for this, as that's always
-               resolved to its address even in shared libs.  */
-	    if (sym->st_shndx != SHN_UNDEF &&
-		ELFW(ST_VISIBILITY)(sym->st_other) == STV_HIDDEN) {
-                rel->r_info = ELFW(R_INFO)(sym_index, R_386_PLT32);
-	        break;
-	    }
-	}
-#elif defined(TCC_TARGET_X86_64)
         case R_X86_64_PC32:
 	{
 	    ElfW(Sym) *sym = &((ElfW(Sym) *)symtab_section->data)[sym_index];
@@ -1240,9 +1205,6 @@ static int prepare_dynamic_rel(TCCState *s1, Section *sr)
 	        break;
 	    }
 	}
-#elif defined(TCC_TARGET_ARM64)
-        case R_AARCH64_PREL32:
-#endif
             if (s1->output_type != TCC_OUTPUT_DLL)
                 break;
             if (get_sym_attr(s1, sym_index, 0)->dyn_index)
@@ -1252,7 +1214,6 @@ static int prepare_dynamic_rel(TCCState *s1, Section *sr)
             break;
         }
     }
-#endif
     return count;
 }
 #endif
@@ -3314,12 +3275,6 @@ invalid:
             ptr = s->data + offset;
             full_read(fd, ptr, size);
         }
-#if defined TCC_TARGET_ARM || defined TCC_TARGET_ARM64 || defined TCC_TARGET_RISCV64
-        /* align code sections to instruction lenght */
-        /* This is needed if we compile a c file after this */
-        if (s->sh_flags & SHF_EXECINSTR)
-            section_add(s, 0, 4);
-#endif
     next: ;
     }
 

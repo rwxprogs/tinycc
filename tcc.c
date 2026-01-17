@@ -128,16 +128,7 @@ static const char help2[] =
     "See also the manual for more details.\n"
     ;
 
-static const char version[] =
-    "tcc version "TCC_VERSION" ("
-#if defined TCC_TARGET_X86_64
-        "x86_64"
-#elif defined TCC_TARGET_ARM64
-        "AArch64"
-#endif
-        " Linux"
-    ")\n"
-    ;
+static const char version[] = "tcc version "TCC_VERSION" (x86_64 Linux)\n";
 
 static void print_dirs(const char *msg, char **paths, int nb_paths)
 {

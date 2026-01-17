@@ -34,7 +34,6 @@ endif
 XFLAGS += -I$(TOP)
 
 X86_64_O = libtcc1.o $(COMMON_O)
-ARM64_O = lib-arm64.o $(COMMON_O)
 COMMON_O = stdatomic.o atomic.o builtin.o alloca.o alloca-bt.o
 LIN_O = dsohandle.o
 
@@ -52,7 +51,6 @@ $(Cbc)COMMON_O += bcheck.o
 EXTRA_O = runmain.o bt-exe.o bt-dll.o bt-log.o bcheck.o
 
 OBJ-x86_64 = $(X86_64_O) $(LIN_O)
-OBJ-arm64 = $(ARM64_O) $(LIN_O)
 
 OBJ-extra = $(filter $(EXTRA_O),$(OBJ-$T))
 OBJ-libtcc1 = $(addprefix $(X),$(filter-out $(OBJ-extra),$(OBJ-$T)))

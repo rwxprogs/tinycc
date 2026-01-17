@@ -60,7 +60,6 @@ LIBS_P = $(LIBS)
 LDFLAGS_P = $(LDFLAGS)
 
 DEF-x86_64         = -DTCC_TARGET_X86_64
-DEF-arm64          = -DTCC_TARGET_ARM64
 
 ifeq ($(INCLUDED),no)
 # --------------------------------------------------------------------------
@@ -73,7 +72,7 @@ TCCDOCS = tcc.1 tcc-doc.html tcc-doc.info
 all: $(PROGS) $(TCCLIBS) $(TCCDOCS)
 
 # cross compiler targets to build
-TCC_X = x86_64 arm64
+TCC_X = x86_64
 
 # cross libtcc1.a targets to build
 LIBTCC1_X = $(TCC_X)
@@ -123,7 +122,6 @@ endif
 ifneq ($(T),$(NATIVE_TARGET))
 # assume support files for cross-targets in "/usr/<triplet>" by default
 TRIPLET-x86_64 ?= x86_64-linux-gnu
-TRIPLET-arm64 ?= aarch64-linux-gnu
 MARCH-$T ?= $(TRIPLET-$T)
 TR = $(if $(TRIPLET-$T),$T,ignored)
 CRT-$(TR) ?= /usr/$(TRIPLET-$T)/lib
@@ -134,7 +132,6 @@ endif
 CORE_FILES = tcc.c tcctools.c libtcc.c tccpp.c tccgen.c tccdbg.c tccelf.c tccasm.c tccrun.c
 CORE_FILES += tcc.h config.h libtcc.h tcctok.h
 x86_64_FILES = $(CORE_FILES) x86_64-gen.c x86_64-link.c x86_64-asm.c x86_64-asm.h
-arm64_FILES = $(CORE_FILES) arm64-gen.c arm64-link.c arm64-asm.c
 
 TCCDEFS_H$(subst yes,,$(CONFIG_predefs)) = tccdefs_.h
 

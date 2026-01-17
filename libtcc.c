@@ -13,17 +13,9 @@
 #include "tccasm.c"
 #include "tccelf.c"
 #include "tccrun.c"
-#if defined(TCC_TARGET_ARM64)
-#include "arm64-gen.c"
-#include "arm64-link.c"
-#include "arm64-asm.c"
-#elif defined(TCC_TARGET_X86_64)
 #include "x86_64-gen.c"
 #include "x86_64-link.c"
 #include "x86_64-asm.c"
-#else
-#error unknown target
-#endif
 #endif /* ONE_SOURCE */
 
 #include "tcc.h"
@@ -1646,57 +1638,14 @@ static int set_flag(TCCState *s, const FlagDef *flags, const char *name)
 }
 
 static const char dumpmachine_str[] =
-/* this is a best guess, please refine as necessary */
-#ifdef TCC_TARGET_I386
-    "i386-pc"
-#elif defined TCC_TARGET_X86_64
     "x86_64-pc"
-#elif defined TCC_TARGET_C67
-    "c67"
-#elif defined TCC_TARGET_ARM
-    "arm"
-#elif defined TCC_TARGET_ARM64
-    "aarch64"
-#elif defined TCC_TARGET_RISCV64
-    "riscv64"
-#endif
     "-"
-#ifdef TCC_TARGET_PE
-    "mingw32"
-#elif defined(TCC_TARGET_MACHO)
-    "apple-darwin"
-#elif TARGETOS_FreeBSD || TARGETOS_FreeBSD_kernel
-    "freebsd"
-#elif TARGETOS_OpenBSD
-    "openbsd"
-#elif TARGETOS_NetBSD
-    "netbsd"
-#elif CONFIG_TCC_MUSL
+#if CONFIG_TCC_MUSL
     "linux-musl"
 #else
     "linux-gnu"
 #endif
 ;
-
-#if defined TCC_TARGET_MACHO
-static uint32_t parse_version(TCCState *s1, const char *version)
-{
-    uint32_t a = 0;
-    uint32_t b = 0;
-    uint32_t c = 0;
-    char* last;
-
-    a = strtoul(version, &last, 10);
-    if (*last == '.') {
-        b = strtoul(&last[1], &last, 10);
-        if (*last == '.')
-             c = strtoul(&last[1], &last, 10);
-    }
-    if (*last || a > 0xffff || b > 0xff || c > 0xff)
-        tcc_error_noabort("version a.b.c not correct: %s", version);
-    return (a << 16) | (b << 8) | c;
-}
-#endif
 
 /* insert args from 'p' (separated by sep or ' ') into argv at position 'optind' */
 static void insert_args(TCCState *s1, char ***pargv, int *pargc, int optind, const char *p, int sep)
