@@ -12,27 +12,6 @@
 #define M 20 /* number of states */
 #define F(n) (n % 20 + 2) /* fib argument */
 
-#ifdef _WIN32
-#include <windows.h>
-#define TF_TYPE(func, param) DWORD WINAPI func(void *param)
-typedef TF_TYPE(ThreadFunc, x);
-HANDLE hh[M];
-void create_thread(ThreadFunc f, int n)
-{
-    DWORD tid;
-    hh[n] = CreateThread(NULL, 0, f, (void*)(size_t)n, 0, &tid);
-}
-void wait_threads(int n)
-{
-    WaitForMultipleObjects(n, hh, TRUE, INFINITE);
-    while (n)
-        CloseHandle(hh[--n]);
-}
-void sleep_ms(unsigned n)
-{
-    Sleep(n);
-}
-#else
 #include <sys/time.h>
 #include <unistd.h>
 #include <pthread.h>
@@ -53,7 +32,7 @@ void sleep_ms(unsigned n)
 {
     usleep(n * 1000);
 }
-#endif
+
 
 void handle_error(void *opaque, const char *msg)
 {
@@ -274,13 +253,9 @@ void time_tcc(int n, const char *src)
 
 static unsigned getclock_ms(void)
 {
-#ifdef _WIN32
-    return GetTickCount();
-#else
     struct timeval tv;
     gettimeofday(&tv, NULL);
     return tv.tv_sec*1000 + (tv.tv_usec+500)/1000;
-#endif
 }
 
 int main(int argc, char **argv)

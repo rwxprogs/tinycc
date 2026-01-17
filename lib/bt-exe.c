@@ -7,9 +7,7 @@
 #define pstrcpy tcc_pstrcpy
 #include "../tccrun.c"
 
-#ifndef _WIN32
-# define __declspec(n)
-#endif
+#define __declspec(n)
 
 __declspec(dllexport)
 void __bt_init(rt_context *p, int is_exe)

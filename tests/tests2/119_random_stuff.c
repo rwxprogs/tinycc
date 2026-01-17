@@ -26,7 +26,6 @@ void tst_shift(void)
   l = l << 64; // illegal. just test
 }
 
-#if !defined(_WIN32)
 #include <sys/mman.h>
 
 void tst_const_addr(void)
@@ -37,7 +36,7 @@ void tst_const_addr(void)
     munmap (addr, 4096);
   }
 }
-#endif
+
 
 struct zero_struct {};
 
@@ -127,9 +126,7 @@ main (void)
   tst_branch();
   tst_shift();
   tst_void_ptr(&big.a[0], 0);
-#if !defined(_WIN32)
   tst_const_addr();
-#endif
   tst_zero_struct();
   tst_big(big);
   tst_adr(&sprintf);

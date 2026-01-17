@@ -1618,11 +1618,7 @@ static CachedInclude *search_cached_include(TCCState *s1, const char *filename, 
     s = basename = tcc_basename(filename);
     h = TOK_HASH_INIT;
     while ((c = (unsigned char)*s) != 0) {
-#ifdef _WIN32
-        h = TOK_HASH_FUNC(h, toup(c));
-#else
         h = TOK_HASH_FUNC(h, c);
-#endif
         s++;
     }
     h &= (CACHED_INCLUDES_HASH_SIZE - 1);
@@ -1782,9 +1778,6 @@ ST_FUNC void tccpp_putfile(const char *filename)
         *tcc_basename(buf) = 0;
     }
     pstrcat(buf, sizeof buf, filename);
-#ifdef _WIN32
-    normalize_slashes(buf);
-#endif
     if (0 == strcmp(file->filename, buf))
         return;
     //printf("new file '%s'\n", buf);
@@ -3571,32 +3564,10 @@ ST_INLN void unget_tok(int last_tok)
 /* init preprocessor */
 
 static const char * const target_os_defs =
-#ifdef TCC_TARGET_PE
-    "_WIN32\0"
-# if PTR_SIZE == 8
-    "_WIN64\0"
-# endif
-#else
-# if defined TCC_TARGET_MACHO
-    "__APPLE__\0"
-# elif TARGETOS_FreeBSD
-    "__FreeBSD__ 12\0"
-# elif TARGETOS_FreeBSD_kernel
-    "__FreeBSD_kernel__\0"
-# elif TARGETOS_NetBSD
-    "__NetBSD__\0"
-# elif TARGETOS_OpenBSD
-    "__OpenBSD__\0"
-# else
     "__linux__\0"
     "__linux\0"
-#  if TARGETOS_ANDROID
-    "__ANDROID__\0"
-#  endif
-# endif
     "__unix__\0"
     "__unix\0"
-#endif
     ;
 
 static void putdef(CString *cs, const char *p)

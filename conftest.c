@@ -8,20 +8,9 @@
 
 /* replace native host macros by compile-time versions */
 const char *platform_macros[] = {
-    "__i386__",             "TCC_TARGET_I386",
     "__x86_64__",           "TCC_TARGET_X86_64",
-    "_WIN32",               "TCC_TARGET_PE",
-    "__arm__",              "TCC_TARGET_ARM",
-    "__ARM_EABI__",         "TCC_ARM_EABI",
     "__aarch64__",          "TCC_TARGET_ARM64",
-    "__riscv",              "TCC_TARGET_RISCV64",
-    "__APPLE__",            "TCC_TARGET_MACHO",
-    "__FreeBSD__",          "TARGETOS_FreeBSD",
-    "__FreeBSD_kernel__",   "TARGETOS_FreeBSD_kernel",
-    "__OpenBSD__",          "TARGETOS_OpenBSD",
-    "__NetBSD__",           "TARGETOS_NetBSD",
     "__linux__",            "TARGETOS_Linux",
-    "__ANDROID__",          "TARGETOS_ANDROID",
 
     "__SIZEOF_POINTER__",   "PTR_SIZE",
     "__SIZEOF_LONG__",      "LONG_SIZE",
@@ -172,12 +161,6 @@ int main(int argc, char **argv)
 
 #include <stdio.h>
 
-#if defined(_WIN32)
-#include <fcntl.h>
-#include <io.h>
-int _CRT_glob = 0;
-#endif
-
 /* Define architecture */
 #if defined(__i386__) || defined _M_IX86
 # define TRIPLET_ARCH "i386"
@@ -196,25 +179,11 @@ int _CRT_glob = 0;
 /* Define OS */
 #if defined (__linux__)
 # define TRIPLET_OS "linux"
-#elif defined (__FreeBSD__) || defined (__FreeBSD_kernel__)
-# define TRIPLET_OS "kfreebsd"
-#elif defined(__NetBSD__)
-# define TRIPLET_OS "netbsd"
-#elif defined(__OpenBSD__)
-# define TRIPLET_OS "openbsd"
-#elif defined(_WIN32)
-# define TRIPLET_OS "win32"
-#elif defined(__APPLE__)
-# define TRIPLET_OS "darwin"
 #elif !defined (__GNU__)
 # define TRIPLET_OS "unknown"
 #endif
 
-#if defined __ANDROID__
-# define ABI_PREFIX "android"
-#else
-# define ABI_PREFIX "gnu"
-#endif
+#define ABI_PREFIX "gnu"
 
 /* Define calling convention and ABI */
 #if defined (__ARM_EABI__)
@@ -227,9 +196,7 @@ int _CRT_glob = 0;
 # define TRIPLET_ABI ABI_PREFIX
 #endif
 
-#if defined _WIN32
-# define TRIPLET TRIPLET_ARCH "-" TRIPLET_OS
-#elif defined __GNU__
+#if defined __GNU__
 # define TRIPLET TRIPLET_ARCH "-" TRIPLET_ABI
 #else
 # define TRIPLET TRIPLET_ARCH "-" TRIPLET_OS "-" TRIPLET_ABI
@@ -237,9 +204,6 @@ int _CRT_glob = 0;
 
 int main(int argc, char *argv[])
 {
-#if defined(_WIN32)
-    _setmode(_fileno(stdout), _O_BINARY);  /* don't translate \n to \r\n */
-#endif
     switch(argc == 2 ? argv[1][0] : 0) {
         case 'b'://igendian
         {

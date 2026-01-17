@@ -59,9 +59,7 @@ static void rt_exit(rt_frame *f, int code);
 /* defined when included from lib/bt-exe.c */
 #ifndef CONFIG_TCC_BACKTRACE_ONLY
 
-#ifndef _WIN32
-# include <sys/mman.h>
-#endif
+#include <sys/mman.h>
 
 static int protect_pages(void *ptr, unsigned long length, int mode);
 static int tcc_relocate_ex(TCCState *s1, void *ptr, unsigned ptr_diff);
@@ -88,9 +86,7 @@ static void win64_del_function_table(void *);
 
 #define PAGEALIGN(n) ((addr_t)n + (-(addr_t)n & (PAGESIZE-1)))
 
-#if !_WIN32 && !__APPLE__
 //#define CONFIG_SELINUX 1
-#endif
 
 static int rt_mem(TCCState *s1, int size)
 {
@@ -157,11 +153,7 @@ ST_FUNC void tcc_run_free(TCCState *s1)
     for ( i = 0; i < s1->nb_loaded_dlls; i++) {
         DLLReference *ref = s1->loaded_dlls[i];
         if ( ref->handle )
-#ifdef _WIN32
-            FreeLibrary((HMODULE)ref->handle);
-#else
             dlclose(ref->handle);
-#endif
     }
     /* unmap or unprotect and free memory */
     ptr = s1->run_ptr;
@@ -435,17 +427,6 @@ redo:
 
 static int protect_pages(void *ptr, unsigned long length, int mode)
 {
-#ifdef _WIN32
-    static const unsigned char protect[] = {
-        PAGE_EXECUTE_READ,
-        PAGE_READONLY,
-        PAGE_READWRITE,
-        PAGE_EXECUTE_READWRITE
-        };
-    DWORD old;
-    if (!VirtualProtect(ptr, length, protect[mode], &old))
-        return -1;
-#else
     static const unsigned char protect[] = {
         PROT_READ | PROT_EXEC,
         PROT_READ,
@@ -454,13 +435,11 @@ static int protect_pages(void *ptr, unsigned long length, int mode)
         };
     if (mprotect(ptr, length, protect[mode]))
         return -1;
-/* XXX: BSD sometimes dump core with bad system call */
-# if (defined TCC_TARGET_ARM && !TARGETOS_BSD) || defined TCC_TARGET_ARM64
+#ifdef TCC_TARGET_ARM64
     if (mode == 0 || mode == 3) {
         void __clear_cache(void *beginning, void *end);
         __clear_cache(ptr, (char *)ptr + length);
     }
-# endif
 #endif
     return 0;
 }
@@ -1173,106 +1152,22 @@ static int rt_error(rt_frame *f, const char *fmt, ...)
 
 /* ------------------------------------------------------------- */
 
-#ifndef _WIN32
-# include <signal.h>
-# ifndef __OpenBSD__
-#  include <sys/ucontext.h>
-# endif
-#else
-# define ucontext_t CONTEXT
-#endif
+#include <signal.h>
+#include <sys/ucontext.h>
 
 /* translate from ucontext_t* to internal rt_context * */
 static void rt_getcontext(ucontext_t *uc, rt_frame *rc)
 {
-#if defined _WIN64
-    rc->ip = uc->Rip;
-    rc->fp = uc->Rbp;
-    rc->sp = uc->Rsp;
-#elif defined _WIN32
-    rc->ip = uc->Eip;
-    rc->fp = uc->Ebp;
-    rc->sp = uc->Esp;
-#elif defined __i386__
-# if defined(__APPLE__)
-    rc->ip = uc->uc_mcontext->__ss.__eip;
-    rc->fp = uc->uc_mcontext->__ss.__ebp;
-# elif defined(__FreeBSD__) || defined(__FreeBSD_kernel__) || defined(__DragonFly__)
-    rc->ip = uc->uc_mcontext.mc_eip;
-    rc->fp = uc->uc_mcontext.mc_ebp;
-# elif defined(__dietlibc__)
-    rc->ip = uc->uc_mcontext.eip;
-    rc->fp = uc->uc_mcontext.ebp;
-# elif defined(__NetBSD__)
-    rc->ip = uc->uc_mcontext.__gregs[_REG_EIP];
-    rc->fp = uc->uc_mcontext.__gregs[_REG_EBP];
-# elif defined(__OpenBSD__)
-    rc->ip = uc->sc_eip;
-    rc->fp = uc->sc_ebp;
-# elif !defined REG_EIP && defined EIP /* fix for glibc 2.1 */
-    rc->ip = uc->uc_mcontext.gregs[EIP];
-    rc->fp = uc->uc_mcontext.gregs[EBP];
-# else
-    rc->ip = uc->uc_mcontext.gregs[REG_EIP];
-    rc->fp = uc->uc_mcontext.gregs[REG_EBP];
-# endif
-#elif defined(__x86_64__)
-# if defined(__APPLE__)
-    rc->ip = uc->uc_mcontext->__ss.__rip;
-    rc->fp = uc->uc_mcontext->__ss.__rbp;
-# elif defined(__FreeBSD__) || defined(__FreeBSD_kernel__) || defined(__DragonFly__)
-    rc->ip = uc->uc_mcontext.mc_rip;
-    rc->fp = uc->uc_mcontext.mc_rbp;
-# elif defined(__NetBSD__)
-    rc->ip = uc->uc_mcontext.__gregs[_REG_RIP];
-    rc->fp = uc->uc_mcontext.__gregs[_REG_RBP];
-# elif defined(__OpenBSD__)
-    rc->ip = uc->sc_rip;
-    rc->fp = uc->sc_rbp;
-# else
+#if defined(__x86_64__)
     rc->ip = uc->uc_mcontext.gregs[REG_RIP];
     rc->fp = uc->uc_mcontext.gregs[REG_RBP];
-# endif
-#elif defined(__arm__) && defined(__NetBSD__)
-    rc->ip = uc->uc_mcontext.__gregs[_REG_PC];
-    rc->fp = uc->uc_mcontext.__gregs[_REG_FP];
-#elif defined(__arm__) && defined(__OpenBSD__)
-    rc->ip = uc->sc_pc;
-    rc->fp = uc->sc_r11;
-#elif defined(__arm__) && defined(__FreeBSD__)
-    rc->ip = uc->uc_mcontext.__gregs[_REG_PC];
-    rc->fp = uc->uc_mcontext.__gregs[_REG_FP];
-#elif defined(__arm__)
-    rc->ip = uc->uc_mcontext.arm_pc;
-    rc->fp = uc->uc_mcontext.arm_fp;
-#elif defined(__aarch64__) && defined(__APPLE__)
-    // see:
-    // /Library/Developer/CommandLineTools/SDKs/MacOSX11.1.sdk/usr/include/mach/arm/_structs.h
-    rc->ip = uc->uc_mcontext->__ss.__pc;
-    rc->fp = uc->uc_mcontext->__ss.__fp;
-#elif defined(__aarch64__) && defined(__FreeBSD__)
-    rc->ip = uc->uc_mcontext.mc_gpregs.gp_elr; /* aka REG_PC */
-    rc->fp = uc->uc_mcontext.mc_gpregs.gp_x[29];
-#elif defined(__aarch64__) && defined(__NetBSD__)
-    rc->ip = uc->uc_mcontext.__gregs[_REG_PC];
-    rc->fp = uc->uc_mcontext.__gregs[_REG_FP];
-#elif defined(__aarch64__) && defined(__OpenBSD__)
-    rc->ip = uc->sc_elr;
-    rc->fp = uc->sc_x[29];
 #elif defined(__aarch64__)
     rc->ip = uc->uc_mcontext.pc;
     rc->fp = uc->uc_mcontext.regs[29];
-#elif defined(__riscv) && defined(__OpenBSD__)
-    rc->ip = uc->sc_sepc;
-    rc->fp = uc->sc_s[0];
-#elif defined(__riscv)
-    rc->ip = uc->uc_mcontext.__gregs[REG_PC];
-    rc->fp = uc->uc_mcontext.__gregs[REG_S0];
 #endif
 }
 
 /* ------------------------------------------------------------- */
-#ifndef _WIN32
 /* signal handler for fatal errors */
 static void sig_error(int signum, siginfo_t *siginf, void *puc)
 {
@@ -1349,46 +1244,6 @@ static void set_exception_handler(void)
 #endif
 }
 
-#else /* WIN32 */
-
-/* signal handler for fatal errors */
-static long __stdcall cpu_exception_handler(EXCEPTION_POINTERS *ex_info)
-{
-    rt_frame f;
-    unsigned code;
-    rt_getcontext(ex_info->ContextRecord, &f);
-
-    switch (code = ex_info->ExceptionRecord->ExceptionCode) {
-    case EXCEPTION_ACCESS_VIOLATION:
-	rt_error(&f, "invalid memory access");
-        break;
-    case EXCEPTION_STACK_OVERFLOW:
-        rt_error(&f, "stack overflow");
-        break;
-    case EXCEPTION_INT_DIVIDE_BY_ZERO:
-        rt_error(&f, "division by zero");
-        break;
-    case EXCEPTION_BREAKPOINT:
-    case EXCEPTION_SINGLE_STEP:
-        f.ip = *(addr_t*)f.sp;
-        rt_error(&f, "breakpoint/single-step exception:");
-        return EXCEPTION_CONTINUE_SEARCH;
-    default:
-        rt_error(&f, "caught exception %08x", code);
-        break;
-    }
-    rt_exit(&f, 255);
-    return EXCEPTION_EXECUTE_HANDLER;
-}
-
-/* Generate a stack backtrace when a CPU exception occurs. */
-static void set_exception_handler(void)
-{
-    SetUnhandledExceptionFilter(cpu_exception_handler);
-}
-
-#endif
-
 /* ------------------------------------------------------------- */
 /* return the PC at frame level 'level'. Return negative if not found */
 #if defined(__i386__) || defined(__x86_64__)
@@ -1411,26 +1266,6 @@ static int rt_get_caller_pc(addr_t *paddr, rt_frame *rc, int level)
     return 0;
 }
 
-/* XXX: only supports linux/bsd */
-#elif defined(__arm__) && !defined(_WIN32)
-static int rt_get_caller_pc(addr_t *paddr, rt_frame *rc, int level)
-{
-    if (level == 0) {
-        *paddr = rc->ip;
-    } else {
-        addr_t fp = rc->fp;
-        while (1) {
-            if (fp < 0x1000)
-                return -1;
-            if (0 == --level)
-                break;
-            fp = ((addr_t *)fp)[0];
-        }
-        *paddr = ((addr_t *)fp)[2];
-    }
-    return 0;
-}
-
 #elif defined(__aarch64__)
 static int rt_get_caller_pc(addr_t *paddr, rt_frame *rc, int level)
 {
@@ -1446,25 +1281,6 @@ static int rt_get_caller_pc(addr_t *paddr, rt_frame *rc, int level)
             fp = ((addr_t *)fp)[0];
         }
         *paddr = ((addr_t *)fp)[1];
-    }
-    return 0;
-}
-
-#elif defined(__riscv)
-static int rt_get_caller_pc(addr_t *paddr, rt_frame *rc, int level)
-{
-    if (level == 0) {
-        *paddr = rc->ip;
-    } else {
-        addr_t fp = rc->fp;
-        while (1) {
-            if (fp < 0x1000)
-                return -1;
-            if (0 == --level)
-                break;
-            fp = ((addr_t *)fp)[-2];
-        }
-        *paddr = ((addr_t *)fp)[-1];
     }
     return 0;
 }

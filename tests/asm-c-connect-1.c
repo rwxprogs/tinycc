@@ -1,10 +1,6 @@
 #include <stdio.h>
 
-#if (defined _WIN32 || defined __APPLE__) && (!defined __TINYC__ || defined __leading_underscore)
-# define _ "_"
-#else
-# define _
-#endif
+#define _
 
 #ifdef __clang__
 /* clang needs some help tp not throw functions away even at -O0 */

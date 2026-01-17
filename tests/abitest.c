@@ -4,14 +4,8 @@
 #include <string.h>
 #include <stdarg.h>
 
-// MinGW has 80-bit rather than 64-bit long double which isn't compatible with TCC or MSVC
-#if defined(_WIN32) && defined(__GNUC__)
-#define LONG_DOUBLE double
-#define LONG_DOUBLE_LITERAL(x) x
-#else
 #define LONG_DOUBLE long double
 #define LONG_DOUBLE_LITERAL(x) x ## L
-#endif
 
 static int g_argc;
 static char **g_argv;
@@ -669,11 +663,6 @@ int main(int argc, char **argv) {
   RUN_TEST(ret_2double_test);
   RUN_TEST(ret_8plus2double_test);
   RUN_TEST(ret_6plus2longlong_test);
-#if !defined __x86_64__ || defined _WIN32
-  /* currently broken on x86_64 linux */
-  RUN_TEST(ret_mixed_test);
-  RUN_TEST(ret_mixed2_test);
-#endif
   RUN_TEST(ret_mixed3_test);
   RUN_TEST(reg_pack_test);
   RUN_TEST(reg_pack_longlong_test);

@@ -1,11 +1,7 @@
 #include <stdio.h>
 #include <string.h>
 #include <setjmp.h>
-#if !defined(_WIN32)
 #include <pthread.h>
-#else
-#include <windows.h>
-#endif
 
 #define	SIZE	10
 #define	COUNT	10
@@ -54,27 +50,17 @@ int
 main (void)
 {
     int i;
-#if !defined(_WIN32)
+
     pthread_t id[SIZE];
-#else
-    HANDLE id[SIZE];
-#endif
+
     int index[SIZE];
 
     for (i = 0; i < SIZE; i++) {
         index[i] = i;
-#if !defined(_WIN32)
         pthread_create (&id[i], NULL, tst, (void *) &index[i]);
-#else
-        id[i] = CreateThread(NULL, 8192, (LPTHREAD_START_ROUTINE) tst, (void *) &index[i], 0, NULL);
-#endif
     }
     for (i = 0; i < SIZE; i++) {
-#if !defined(_WIN32)
         pthread_join (id[i], NULL);
-#else
-        WaitForSingleObject(id[i], INFINITE);
-#endif
     }
     for (i = 0; i < SIZE; i++) {
         if (count[i] != COUNT)

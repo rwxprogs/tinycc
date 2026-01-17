@@ -23,7 +23,6 @@
 #include <setjmp.h>
 #include <time.h>
 
-#ifndef _WIN32
 # include <unistd.h>
 # include <sys/time.h>
 # ifndef CONFIG_TCC_STATIC
@@ -32,48 +31,6 @@
 /* XXX: need to define this to use them in non ISOC99 context */
 extern float strtof (const char *__nptr, char **__endptr);
 extern long double strtold (const char *__nptr, char **__endptr);
-#endif
-
-#ifdef _WIN32
-# define WIN32_LEAN_AND_MEAN 1
-# include <windows.h>
-# include <io.h> /* open, close etc. */
-# include <direct.h> /* getcwd */
-# include <malloc.h> /* alloca */
-# ifndef _MSC_VER
-#  include <stdint.h>
-# endif
-# define inline __inline
-# define snprintf _snprintf
-# define vsnprintf _vsnprintf
-# ifndef __GNUC__
-#  define strtold (long double)strtod
-#  define strtof (float)strtod
-#  define strtoll _strtoi64
-#  define strtoull _strtoui64
-# endif
-# ifdef LIBTCC_AS_DLL
-#  define LIBTCCAPI __declspec(dllexport)
-#  define PUB_FUNC LIBTCCAPI
-# endif
-# ifdef _MSC_VER
-#  pragma warning (disable : 4244)  // conversion from 'uint64_t' to 'int', possible loss of data
-#  pragma warning (disable : 4267)  // conversion from 'size_t' to 'int', possible loss of data
-#  pragma warning (disable : 4996)  // The POSIX name for this item is deprecated. Instead, use the ISO C and C++ conformant name
-#  pragma warning (disable : 4018)  // signed/unsigned mismatch
-#  pragma warning (disable : 4146)  // unary minus operator applied to unsigned type, result still unsigned
-#  define ssize_t intptr_t
-#  ifdef _X86_
-#   define __i386__ 1
-#  endif
-#  ifdef _AMD64_
-#   define __x86_64__ 1
-#  endif
-# endif
-# ifndef va_copy
-#  define va_copy(a,b) a = b
-# endif
-#endif
 
 #ifndef O_BINARY
 # define O_BINARY 0
@@ -91,27 +48,14 @@ extern long double strtold (const char *__nptr, char **__endptr);
 #define countof(tab) (sizeof(tab) / sizeof((tab)[0]))
 #endif
 
-#ifdef _MSC_VER
-# define NORETURN __declspec(noreturn)
-# define ALIGNED(x) __declspec(align(x))
-# define PRINTF_LIKE(x,y)
-#else
-# define NORETURN __attribute__((noreturn))
-# define ALIGNED(x) __attribute__((aligned(x)))
-# define PRINTF_LIKE(x,y) __attribute__ ((format (printf, (x), (y))))
-#endif
+#define NORETURN __attribute__((noreturn))
+#define ALIGNED(x) __attribute__((aligned(x)))
+#define PRINTF_LIKE(x,y) __attribute__ ((format (printf, (x), (y))))
 
-#ifdef _WIN32
-# define IS_DIRSEP(c) (c == '/' || c == '\\')
-# define IS_ABSPATH(p) (IS_DIRSEP(p[0]) || (p[0] && p[1] == ':' && IS_DIRSEP(p[2])))
-# define PATHCMP stricmp
-# define PATHSEP ";"
-#else
-# define IS_DIRSEP(c) (c == '/')
-# define IS_ABSPATH(p) IS_DIRSEP(p[0])
-# define PATHCMP strcmp
-# define PATHSEP ":"
-#endif
+#define IS_DIRSEP(c) (c == '/')
+#define IS_ABSPATH(p) IS_DIRSEP(p[0])
+#define PATHCMP strcmp
+#define PATHSEP ":"
 
 /* -------------------------------------------- */
 
@@ -134,47 +78,8 @@ extern long double strtold (const char *__nptr, char **__endptr);
 /* #define TCC_TARGET_C67    *//* TMS320C67xx code generator */
 /* #define TCC_TARGET_RISCV64 *//* risc-v code generator */
 
-/* default target is I386 */
-#if !defined(TCC_TARGET_I386) && !defined(TCC_TARGET_ARM) && \
-    !defined(TCC_TARGET_ARM64) && !defined(TCC_TARGET_C67) && \
-    !defined(TCC_TARGET_X86_64) && !defined(TCC_TARGET_RISCV64)
-# if defined __x86_64__
-#  define TCC_TARGET_X86_64
-# elif defined __arm__
-#  define TCC_TARGET_ARM
-#  define TCC_ARM_EABI
-#  define TCC_ARM_VFP
-#  define TCC_ARM_HARDFLOAT
-# elif defined __aarch64__
-#  define TCC_TARGET_ARM64
-# elif defined __riscv
-#  define TCC_TARGET_RISCV64
-# else
-#  define TCC_TARGET_I386
-# endif
-# ifdef _WIN32
-#  define TCC_TARGET_PE 1
-# endif
-# ifdef __APPLE__
-#  define TCC_TARGET_MACHO 1
-# endif
-#endif
-
 /* only native compiler supports -run */
-#if defined _WIN32 == defined TCC_TARGET_PE \
-    && defined __APPLE__ == defined TCC_TARGET_MACHO
-# if defined __i386__ && defined TCC_TARGET_I386
-#  define TCC_IS_NATIVE
-# elif defined __x86_64__ && defined TCC_TARGET_X86_64
-#  define TCC_IS_NATIVE
-# elif defined __arm__ && defined TCC_TARGET_ARM
-#  define TCC_IS_NATIVE
-# elif defined __aarch64__ && defined TCC_TARGET_ARM64
-#  define TCC_IS_NATIVE
-# elif defined __riscv && defined __LP64__ && defined TCC_TARGET_RISCV64
-#  define TCC_IS_NATIVE
-# endif
-#endif
+#define TCC_IS_NATIVE
 
 #if defined CONFIG_TCC_BACKTRACE && CONFIG_TCC_BACKTRACE==0
 # undef CONFIG_TCC_BACKTRACE
@@ -209,14 +114,6 @@ extern long double strtold (const char *__nptr, char **__endptr);
 # define TCC_TARGET_UNIX 1
 #endif
 
-/* No ten-byte long doubles on window and macos except in
-   cross-compilers made by a mingw-GCC */
-#if defined TCC_TARGET_PE \
-    || (defined TCC_TARGET_MACHO && defined TCC_TARGET_ARM64) \
-    || (defined _WIN32 && !defined __GNUC__)
-# define TCC_USING_DOUBLE_FOR_LDOUBLE 1
-#endif
-
 #ifdef CONFIG_TCC_PIE
 # define CONFIG_TCC_PIC 1
 #endif
@@ -231,7 +128,7 @@ extern long double strtold (const char *__nptr, char **__endptr);
 #ifndef CONFIG_SYSROOT
 # define CONFIG_SYSROOT ""
 #endif
-#if !defined CONFIG_TCCDIR && !defined _WIN32
+#if !defined CONFIG_TCCDIR
 # define CONFIG_TCCDIR "/usr/local/lib/tcc"
 #endif
 #ifndef CONFIG_LDDIR
@@ -258,27 +155,19 @@ extern long double strtold (const char *__nptr, char **__endptr);
 
 /* system include paths */
 #ifndef CONFIG_TCC_SYSINCLUDEPATHS
-# if defined TCC_TARGET_PE || defined _WIN32
-#  define CONFIG_TCC_SYSINCLUDEPATHS "{B}/include"PATHSEP"{B}/include/winapi"
-# else
-#  define CONFIG_TCC_SYSINCLUDEPATHS \
+#define CONFIG_TCC_SYSINCLUDEPATHS \
         "{B}/include" \
     ":" ALSO_TRIPLET(CONFIG_SYSROOT "/usr/local/include") \
     ":" ALSO_TRIPLET(CONFIG_SYSROOT CONFIG_USR_INCLUDE)
-# endif
 #endif
 
 /* library search paths */
 #ifndef CONFIG_TCC_LIBPATHS
-# if defined TCC_TARGET_PE || defined _WIN32
-#  define CONFIG_TCC_LIBPATHS "{B}/lib"
-# else
-#  define CONFIG_TCC_LIBPATHS \
+#define CONFIG_TCC_LIBPATHS \
         "{B}" \
     ":" ALSO_TRIPLET(CONFIG_SYSROOT "/usr/" CONFIG_LDDIR) \
     ":" ALSO_TRIPLET(CONFIG_SYSROOT "/" CONFIG_LDDIR) \
     ":" ALSO_TRIPLET(CONFIG_SYSROOT "/usr/local/" CONFIG_LDDIR)
-# endif
 #endif
 
 /* name of ELF interpreter */
@@ -1277,9 +1166,6 @@ ST_FUNC void tcc_add_pragma_libs(TCCState *s1);
 PUB_FUNC int tcc_add_library_err(TCCState *s, const char *f);
 PUB_FUNC void tcc_print_stats(TCCState *s, unsigned total_time);
 PUB_FUNC int tcc_parse_args(TCCState *s, int *argc, char ***argv);
-#ifdef _WIN32
-ST_FUNC char *normalize_slashes(char *path);
-#endif
 ST_FUNC DLLReference *tcc_add_dllref(TCCState *s1, const char *dllname, int level);
 ST_FUNC char *tcc_load_text(int fd);
 /* for #pragma once */
@@ -1886,28 +1772,6 @@ dwarf_read_sleb128(unsigned char **ln, unsigned char *end)
 
 /********************************************************/
 #if CONFIG_TCC_SEMLOCK
-#if defined _WIN32
-typedef struct { int init; CRITICAL_SECTION cs; } TCCSem;
-static inline void wait_sem(TCCSem *p) {
-    if (!p->init)
-        InitializeCriticalSection(&p->cs), p->init = 1;
-    EnterCriticalSection(&p->cs);
-}
-static inline void post_sem(TCCSem *p) {
-    LeaveCriticalSection(&p->cs);
-}
-#elif defined __APPLE__
-#include <dispatch/dispatch.h>
-typedef struct { int init; dispatch_semaphore_t sem; } TCCSem;
-static inline void wait_sem(TCCSem *p) {
-    if (!p->init)
-        p->sem = dispatch_semaphore_create(1), p->init = 1;
-    dispatch_semaphore_wait(p->sem, DISPATCH_TIME_FOREVER);
-}
-static inline void post_sem(TCCSem *p) {
-    dispatch_semaphore_signal(p->sem);
-}
-#else
 #include <semaphore.h>
 typedef struct { int init; sem_t sem; } TCCSem;
 static inline void wait_sem(TCCSem *p) {
@@ -1918,7 +1782,6 @@ static inline void wait_sem(TCCSem *p) {
 static inline void post_sem(TCCSem *p) {
     sem_post(&p->sem);
 }
-#endif
 #define TCC_SEM(s) TCCSem s
 #define WAIT_SEM wait_sem
 #define POST_SEM post_sem

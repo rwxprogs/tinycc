@@ -260,13 +260,9 @@ static char *default_outputfile(TCCState *s, const char *first_file)
 
 static unsigned getclock_ms(void)
 {
-#ifdef _WIN32
-    return GetTickCount();
-#else
     struct timeval tv;
     gettimeofday(&tv, NULL);
     return tv.tv_sec*1000 + (tv.tv_usec+500)/1000;
-#endif
 }
 
 int main(int argc, char **argv)

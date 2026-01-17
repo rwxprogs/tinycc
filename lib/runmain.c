@@ -7,7 +7,6 @@
 # define _(s) _##s
 #endif
 
-#ifndef _WIN32
 extern void (*_(_init_array_start)[]) (int argc, char **argv, char **envp);
 extern void (*_(_init_array_end)[]) (int argc, char **argv, char **envp);
 static void run_ctors(int argc, char **argv, char **env)
@@ -16,7 +15,6 @@ static void run_ctors(int argc, char **argv, char **env)
     while (&_(_init_array_start)[i] != _(_init_array_end))
         (*_(_init_array_start)[i++])(argc, argv, env);
 }
-#endif
 
 extern void (*_(_fini_array_start)[]) (void);
 extern void (*_(_fini_array_end)[]) (void);
@@ -71,7 +69,6 @@ void exit(int code)
     __rt_exit(&f, code);
 }
 
-#ifndef _WIN32
 int main(int, char**, char**);
 
 int _runmain(int argc, char **argv, char **envp)
@@ -83,4 +80,3 @@ int _runmain(int argc, char **argv, char **envp)
     __run_on_exit(ret);
     return ret;
 }
-#endif

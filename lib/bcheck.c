@@ -33,10 +33,8 @@
 #include <malloc.h>
 #endif
 
-#if !defined(_WIN32)
 #include <unistd.h>
 #include <sys/syscall.h>
-#endif
 
 #include "config.h"
 
@@ -55,58 +53,7 @@
 #endif
 #define FASTCALL __attribute__((regparm(3)))
 
-#ifdef _WIN32
-# define DLL_EXPORT __declspec(dllexport)
-#else
-# define DLL_EXPORT
-#endif
-
-#if defined(__FreeBSD__) \
- || defined(__FreeBSD_kernel__) \
- || defined(__DragonFly__) \
- || defined(__OpenBSD__) \
- || defined(__NetBSD__) \
- || defined(__dietlibc__)
-
-#include <sys/mman.h>
-#define INIT_SEM()
-#define EXIT_SEM()
-#define WAIT_SEM()
-#define POST_SEM()
-#define TRY_SEM()
-#define HAVE_MEMALIGN          (0)
-#define MALLOC_REDIR           (0)
-#define HAVE_PTHREAD_CREATE    (0)
-#define HAVE_CTYPE             (0)
-#define HAVE_ERRNO             (0)
-#define HAVE_SIGNAL            (0)
-#define HAVE_SIGACTION         (0)
-#define HAVE_FORK              (0)
-#define HAVE_TLS_FUNC          (0)
-#define HAVE_TLS_VAR           (0)
-
-#elif defined(_WIN32)
-
-#include <windows.h>
-#include <signal.h>
-static CRITICAL_SECTION bounds_sem;
-#define INIT_SEM()             InitializeCriticalSection(&bounds_sem)
-#define EXIT_SEM()             DeleteCriticalSection(&bounds_sem)
-#define WAIT_SEM()             EnterCriticalSection(&bounds_sem)
-#define POST_SEM()             LeaveCriticalSection(&bounds_sem)
-#define TRY_SEM()              TryEnterCriticalSection(&bounds_sem)
-#define HAVE_MEMALIGN          (0)
-#define MALLOC_REDIR           (0)
-#define HAVE_PTHREAD_CREATE    (0)
-#define HAVE_CTYPE             (0)
-#define HAVE_ERRNO             (0)
-#define HAVE_SIGNAL            (1)
-#define HAVE_SIGACTION         (0)
-#define HAVE_FORK              (0)
-#define HAVE_TLS_FUNC          (1)
-#define HAVE_TLS_VAR           (0)
-
-#else
+#define DLL_EXPORT
 
 #define __USE_GNU              /* get RTLD_NEXT */
 #include <sys/mman.h>
@@ -115,32 +62,7 @@ static CRITICAL_SECTION bounds_sem;
 #include <dlfcn.h>
 #include <errno.h>
 #include <signal.h>
-#ifdef __APPLE__
-#include <dispatch/dispatch.h>
-static dispatch_semaphore_t bounds_sem;
-#define INIT_SEM()             bounds_sem = dispatch_semaphore_create(1)
-#define EXIT_SEM()             dispatch_release(*(dispatch_object_t*)&bounds_sem)
-#define WAIT_SEM()             if (use_sem) dispatch_semaphore_wait(bounds_sem, DISPATCH_TIME_FOREVER)
-#define POST_SEM()             if (use_sem) dispatch_semaphore_signal(bounds_sem)
-#define TRY_SEM()              if (use_sem) dispatch_semaphore_wait(bounds_sem, DISPATCH_TIME_NOW)
-#elif 0
-#include <semaphore.h>
-static sem_t bounds_sem;
-#define INIT_SEM()             sem_init (&bounds_sem, 0, 1)
-#define EXIT_SEM()             sem_destroy (&bounds_sem)
-#define WAIT_SEM()             if (use_sem) while (sem_wait (&bounds_sem) < 0 \
-                                                   && errno == EINTR)
-#define POST_SEM()             if (use_sem) sem_post (&bounds_sem)
-#define TRY_SEM()              if (use_sem) while (sem_trywait (&bounds_sem) < 0 \
-                                                   && errno == EINTR)
-#elif 0
-static pthread_mutex_t bounds_mtx;
-#define INIT_SEM()             pthread_mutex_init (&bounds_mtx, NULL)
-#define EXIT_SEM()             pthread_mutex_destroy (&bounds_mtx)
-#define WAIT_SEM()             if (use_sem) pthread_mutex_lock (&bounds_mtx)
-#define POST_SEM()             if (use_sem) pthread_mutex_unlock (&bounds_mtx)
-#define TRY_SEM()              if (use_sem) pthread_mutex_trylock (&bounds_mtx)
-#else
+
 static pthread_spinlock_t bounds_spin;
 /* about 25% faster then semaphore. */
 #define INIT_SEM()             pthread_spin_init (&bounds_spin, 0)
@@ -148,7 +70,7 @@ static pthread_spinlock_t bounds_spin;
 #define WAIT_SEM()             if (use_sem) pthread_spin_lock (&bounds_spin)
 #define POST_SEM()             if (use_sem) pthread_spin_unlock (&bounds_spin)
 #define TRY_SEM()              if (use_sem) pthread_spin_trylock (&bounds_spin)
-#endif
+
 #define HAVE_MEMALIGN          (1)
 #define MALLOC_REDIR           (1)
 #define HAVE_PTHREAD_CREATE    (1)
@@ -164,10 +86,10 @@ static pthread_spinlock_t bounds_spin;
 #define HAVE_TLS_FUNC          (1)
 #define HAVE_TLS_VAR           (0)
 #endif
-#if defined CONFIG_TCC_MUSL || defined __ANDROID__
+#if defined CONFIG_TCC_MUSL
 # undef HAVE_CTYPE
 #endif
-#endif
+
 
 #if MALLOC_REDIR
 static void *(*malloc_redir) (size_t);
@@ -223,25 +145,8 @@ typedef struct alloca_list_struct {
     struct alloca_list_struct *next;
 } alloca_list_type;
 
-#if defined(_WIN32)
-#define BOUND_TID_TYPE		DWORD
-#define BOUND_GET_TID(id)	id = GetCurrentThreadId()
-#elif defined(__OpenBSD__)
-#define BOUND_TID_TYPE		pid_t
-#define BOUND_GET_TID(id)	id = getthrid()
-#elif defined(__FreeBSD__)
-#define BOUND_TID_TYPE		pid_t
-#define BOUND_GET_TID(id)	syscall (SYS_thr_self, &id)
-#elif  defined(__NetBSD__)
-#define BOUND_TID_TYPE		pid_t
-#define BOUND_GET_TID(id)	id = syscall (SYS__lwp_self)
-#elif defined(__linux__)
 #define BOUND_TID_TYPE		pid_t
 #define BOUND_GET_TID(id)	id = syscall (SYS_gettid)
-#else
-#define BOUND_TID_TYPE		int
-#define BOUND_GET_TID(id)	id = 0
-#endif
 
 typedef struct jmp_list_struct {
     void *penv;
@@ -276,12 +181,10 @@ void __bound_init(size_t *, int);
 void __bound_main_arg(int argc, char **argv, char **envp);
 void __bound_exit(void);
 void __bound_exit_dll(size_t *);
-#if !defined(_WIN32)
 void *__bound_mmap (void *start, size_t size, int prot, int flags, int fd,
                     off_t offset);
 int __bound_munmap (void *start, size_t size);
 DLL_EXPORT void __bound_siglongjmp(jmp_buf env, int val);
-#endif
 DLL_EXPORT void __bound_new_region(void *p, size_t size);
 DLL_EXPORT void __bound_setjmp(jmp_buf env);
 DLL_EXPORT void __bound_longjmp(jmp_buf env, int val);
@@ -352,43 +255,7 @@ static unsigned char print_statistic;
 static unsigned char no_strdup;
 static unsigned char use_sem;
 static _Atomic int never_fatal;
-#if HAVE_TLS_FUNC
-#if defined(_WIN32)
-static int no_checking = 0;
-static DWORD no_checking_key;
-#define NO_CHECKING_CHECK() if (!p) {                                         \
-                                  p = (int *) LocalAlloc(LPTR, sizeof(int));  \
-                                  if (!p) bound_alloc_error("tls malloc");    \
-                                  *p = 0;                                     \
-                                  TlsSetValue(no_checking_key, p);            \
-                            }
-#define NO_CHECKING_GET()   ({ int *p = TlsGetValue(no_checking_key);         \
-                               NO_CHECKING_CHECK();                           \
-                               *p;                                            \
-                            })
-#define NO_CHECKING_SET(v)  { int *p = TlsGetValue(no_checking_key);          \
-                              NO_CHECKING_CHECK();                            \
-                              *p = v;                                         \
-                            }
-#else
-static int no_checking = 0;
-static pthread_key_t no_checking_key;
-#define NO_CHECKING_CHECK() if (!p) {                                         \
-                                  p = (int *) BOUND_MALLOC(sizeof(int));      \
-                                  if (!p) bound_alloc_error("tls malloc");    \
-                                  *p = 0;                                     \
-                                  pthread_setspecific(no_checking_key, p);    \
-                            }
-#define NO_CHECKING_GET()   ({ int *p = pthread_getspecific(no_checking_key); \
-                               NO_CHECKING_CHECK();                           \
-                               *p;                                            \
-                            })
-#define NO_CHECKING_SET(v)  { int *p = pthread_getspecific(no_checking_key);  \
-                              NO_CHECKING_CHECK();                            \
-                              *p = v;                                         \
-                            }
-#endif
-#elif HAVE_TLS_VAR
+#if HAVE_TLS_VAR
 static __thread int no_checking = 0;
 #define NO_CHECKING_GET()  no_checking
 #define NO_CHECKING_SET(v) no_checking = v 
@@ -903,9 +770,7 @@ static void __bound_long_jump(jmp_buf env, int val, int sig, const char *func)
         }
         POST_SEM();
     }
-#if !defined(_WIN32)
     sig ? siglongjmp(env, val) :
-#endif
     longjmp (env, val);
 }
 
@@ -914,12 +779,10 @@ void __bound_longjmp(jmp_buf env, int val)
     __bound_long_jump(env,val, 0, __FUNCTION__);
 }
 
-#if !defined(_WIN32)
 void __bound_siglongjmp(jmp_buf env, int val)
 {
     __bound_long_jump(env,val, 1, __FUNCTION__);
 }
-#endif
 
 #if (defined(__GNUC__) && (__GNUC__ >= 6)) || defined(__clang__)
 #pragma GCC diagnostic pop
@@ -937,13 +800,8 @@ void __bound_init(size_t *p, int mode)
     inited = 1;
 
 #if HAVE_TLS_FUNC
-#if defined(_WIN32)
-    no_checking_key = TlsAlloc();
-    TlsSetValue(no_checking_key, &no_checking);
-#else
     pthread_key_create(&no_checking_key, NULL);
     pthread_setspecific(no_checking_key, &no_checking);
-#endif
 #endif
     NO_CHECKING_SET(1);
 
@@ -1105,7 +963,7 @@ no_bounds:
 }
 
 void
-#if (defined(__GLIBC__) && (__GLIBC_MINOR__ >= 4)) || defined(_WIN32)
+#if (defined(__GLIBC__) && (__GLIBC_MINOR__ >= 4))
 __attribute__((constructor))
 #endif
 __bound_main_arg(int argc, char **argv, char **envp)
@@ -1169,9 +1027,7 @@ void __attribute__((destructor)) __bound_exit(void)
     dprintf(stderr, "%s, %s():\n", __FILE__, __FUNCTION__);
 
     if (inited) {
-#if !defined(_WIN32) && !defined(__APPLE__) && !defined CONFIG_TCC_MUSL && \
-    !defined(__OpenBSD__) && !defined(__FreeBSD__) && !defined(__NetBSD__) && \
-    !defined(__ANDROID__)
+#if !defined CONFIG_TCC_MUSL
         if (print_heap) {
             extern void __libc_freeres (void);
             __libc_freeres ();
@@ -1217,11 +1073,7 @@ void __attribute__((destructor)) __bound_exit(void)
         POST_SEM ();
         EXIT_SEM ();
 #if HAVE_TLS_FUNC
-#if defined(_WIN32)
-        TlsFree(no_checking_key);
-#else
         pthread_key_delete(no_checking_key);
-#endif
 #endif
         inited = 0;
         if (print_statistic) {
@@ -1664,7 +1516,6 @@ void *__bound_calloc(size_t nmemb, size_t size)
     return ptr;
 }
 
-#if !defined(_WIN32)
 void *__bound_mmap (void *start, size_t size, int prot,
                     int flags, int fd, off_t offset)
 {
@@ -1697,7 +1548,6 @@ int __bound_munmap (void *start, size_t size)
     result = munmap (start, size);
     return result;
 }
-#endif
 
 /* some useful checked functions */
 

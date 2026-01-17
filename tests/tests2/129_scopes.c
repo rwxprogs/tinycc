@@ -140,7 +140,7 @@ int f6(int x)
 
 #if defined __TINYC__ \
     ? !defined __leading_underscore \
-    : !(defined __APPLE__ || defined _WIN32)
+    : !defined __APPLE__
 # define _
 #else
 # define _ "_"

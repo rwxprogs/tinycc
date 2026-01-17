@@ -1701,9 +1701,6 @@ static void tcc_tcov_add_file(TCCState *s1, const char *filename)
     ptr = section_ptr_add(tcov_section, cstr.size + 1);
     strcpy((char *)ptr, cstr.data);
     unlink((char *)ptr);
-#ifdef _WIN32
-    normalize_slashes((char *)ptr);
-#endif
     cstr_free (&cstr);
 
     cstr_new(&cstr);

@@ -17,29 +17,12 @@
 /* __VA_ARGS__ and __func__ support */
 #define C99_MACROS
 
-#if defined(_WIN32) \
-    || (defined(__arm__) \
-        && (defined(__FreeBSD__) \
-         || defined(__OpenBSD__) \
-         || defined(__NetBSD__) \
-         || defined __ANDROID__))
-#define LONG_LONG_FORMAT "%lld"
-#define ULONG_LONG_FORMAT "%llu"
-#define XLONG_LONG_FORMAT "%llx"
-#else
 #define LONG_LONG_FORMAT "%Ld"
 #define ULONG_LONG_FORMAT "%Lu"
 #define XLONG_LONG_FORMAT "%Lx"
-#endif
 
-// MinGW has 80-bit rather than 64-bit long double which isn't compatible with TCC or MSVC
-#if defined(_WIN32) && defined(__GNUC__)
-#define LONG_DOUBLE double
-#define LONG_DOUBLE_LITERAL(x) x
-#else
 #define LONG_DOUBLE long double
 #define LONG_DOUBLE_LITERAL(x) x ## L
-#endif
 
 typedef __SIZE_TYPE__ uintptr_t;
 
@@ -2168,13 +2151,8 @@ void bitfield_test(void)
 /* declare strto* functions as they are C99 */
 double strtod(const char *nptr, char **endptr);
 
-#if defined(_WIN32)
-float strtof(const char *nptr, char **endptr) {return (float)strtod(nptr, endptr);}
-LONG_DOUBLE strtold(const char *nptr, char **endptr) {return (LONG_DOUBLE)strtod(nptr, endptr);}
-#else
 float strtof(const char *nptr, char **endptr);
 LONG_DOUBLE strtold(const char *nptr, char **endptr);
-#endif
 
 #if CC_NAME == CC_clang
 /* In clang 0.0/0.0 is nan and not -nan.
@@ -3472,14 +3450,12 @@ void other_constraints_test(void)
 #endif
 }
 
-#ifndef _WIN32
 /* Test global asm blocks playing with aliases.  */
 void base_func(void)
 {
   printf ("asmc: base\n");
 }
 
-#ifndef __APPLE__
 extern void override_func1 (void);
 extern void override_func2 (void);
 
@@ -3551,8 +3527,8 @@ void asm_local_label_diff (void)
 {
   printf ("asm_local_label_diff: %d %d\n", alld_stuff[0], alld_stuff[1]);
 }
-#endif
-#endif
+
+
 
 /* This checks that static local variables are available from assembler.  */
 void asm_local_statics (void)
@@ -3734,7 +3710,7 @@ void asm_dot_test(void)
             asm(".text; mov $123, %eax; jmp p0");
 #endif
 	case 3:
-#if !defined(_WIN32) && !defined(__clang__)
+#if !defined(__clang__)
             asm(".pushsection \".data\"; Y=.; .int 999; X=Y; .int 456; X=.-4; .popsection");
 #else
             asm(".data; Y=.; .int 999; X=Y; .int 456; X=.-4; .text");
@@ -3745,11 +3721,7 @@ void asm_dot_test(void)
             /* Bah!  Clang!  Doesn't want to redefine 'X'  */
             asm(".text; mov $789,%eax; jmp p0");
 #else
-#ifndef _WIN32
             asm(".data; X=.; .int 789; Y=.; .int 999; .previous");
-#else
-            asm(".data; X=.; .int 789; Y=.; .int 999; .text");
-#endif
             asm(".text; mov X"RX",%eax; X=Y; jmp p0");
 #endif
         case 0:
@@ -3823,8 +3795,7 @@ void asm_test(void)
     printf("set=0x%x\n", set);
     val = 0x01020304;
     printf("swab32(0x%08x) = 0x%0x\n", val, swab32(val));
-#ifndef _WIN32
-#ifndef __APPLE__
+
     override_func1();
     override_func2();
     /* The base_func ref from the following inline asm should find
@@ -3833,8 +3804,7 @@ void asm_test(void)
     override_func3();
     printf("asmstr: %s\n", get_asm_string());
     asm_local_label_diff();
-#endif
-#endif
+
     asm_local_statics();
 #ifndef __clang__
     /* clang can't deal with the type change */
@@ -3993,9 +3963,6 @@ void builtin_test(void)
     }
 }
 
-#if defined _WIN32 || (defined __APPLE__ && GCC_MAJOR >= 15)
-void weak_test(void) {}
-#else
 extern int __attribute__((weak)) weak_f1(void);
 extern int __attribute__((weak)) weak_f2(void);
 extern int                       weak_f3(void);
@@ -4060,7 +4027,7 @@ int __attribute__((weak)) weak_f2() { return 222; }
 int __attribute__((weak)) weak_f3() { return 333; }
 int __attribute__((weak)) weak_v2 = 222;
 int __attribute__((weak)) weak_v3 = 333;
-#endif
+
 
 void const_func(const int a)
 {
@@ -4299,12 +4266,10 @@ typedef struct gate_struct64 gate_desc;
 gate_desc a_gate_desc;
 void attrib_test(void)
 {
-#ifndef _WIN32
   printf("attr: %d %d %d %d\n", sizeof(struct Spacked),
 	 sizeof(spacked), sizeof(Spacked2), sizeof(spacked2));
   printf("attr: %d %d\n", sizeof(Spacked3), sizeof(spacked3));
   printf("attr: %d %d\n", sizeof(gate_desc), sizeof(a_gate_desc));
-#endif
 }
 extern __attribute__((__unused__)) char * __attribute__((__unused__)) *
 strange_attrib_placement (void);
@@ -4381,7 +4346,8 @@ void whitespace_test(void)
     char *str;
     int tcc_test = 1;
 
-#if 1
+
+#if 1
     pri\
 ntf("whitspace:\n");
 #endif
@@ -4404,7 +4370,8 @@ ntf("min=%d\n", 4);
 ";
     printf("len1=%d str[0]=%d\n", strlen(str), str[0]);
 #endif
-    printf("len1=%d\n", strlen("a
+    printf("len1=%d\n", strlen("
+a
 "));
 #else
     printf("len1=1\nlen1=1 str[0]=10\nlen1=3\n");

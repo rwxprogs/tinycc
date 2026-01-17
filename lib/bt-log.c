@@ -6,11 +6,7 @@
 #include <string.h>
 #undef __attribute__
 
-#ifdef _WIN32
-# define DLL_EXPORT __declspec(dllexport)
-#else
-# define DLL_EXPORT
-#endif
+#define DLL_EXPORT
 
 /* Needed when using ...libtcc1-usegcc=yes in lib/Makefile */
 #if (defined(__GNUC__) && (__GNUC__ >= 6)) || defined(__clang__)
