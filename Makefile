@@ -59,8 +59,6 @@ CFLAGS_P = $(CFLAGS) -pg -static -DCONFIG_TCC_STATIC -DTCC_PROFILE
 LIBS_P = $(LIBS)
 LDFLAGS_P = $(LDFLAGS)
 
-DEF-i386           = -DTCC_TARGET_I386
-DEF-i386-OpenBSD   = $(DEF-i386) -DTARGETOS_OpenBSD
 DEF-x86_64         = -DTCC_TARGET_X86_64
 DEF-arm64          = -DTCC_TARGET_ARM64
 DEF-arm64-FreeBSD  = $(DEF-arm64) -DTARGETOS_FreeBSD
@@ -81,7 +79,7 @@ TCCDOCS = tcc.1 tcc-doc.html tcc-doc.info
 all: $(PROGS) $(TCCLIBS) $(TCCDOCS)
 
 # cross compiler targets to build
-TCC_X = i386 x86_64 arm64
+TCC_X = x86_64 arm64
 
 # cross libtcc1.a targets to build
 LIBTCC1_X = $(TCC_X)
@@ -130,10 +128,8 @@ endif
 
 ifneq ($(T),$(NATIVE_TARGET))
 # assume support files for cross-targets in "/usr/<triplet>" by default
-TRIPLET-i386 ?= i686-linux-gnu
 TRIPLET-x86_64 ?= x86_64-linux-gnu
 TRIPLET-arm64 ?= aarch64-linux-gnu
-MARCH-i386 ?= i386-linux-gnu
 MARCH-$T ?= $(TRIPLET-$T)
 TR = $(if $(TRIPLET-$T),$T,ignored)
 CRT-$(TR) ?= /usr/$(TRIPLET-$T)/lib
@@ -143,8 +139,7 @@ endif
 
 CORE_FILES = tcc.c tcctools.c libtcc.c tccpp.c tccgen.c tccdbg.c tccelf.c tccasm.c tccrun.c
 CORE_FILES += tcc.h config.h libtcc.h tcctok.h
-i386_FILES = $(CORE_FILES) i386-gen.c i386-link.c i386-asm.c i386-asm.h i386-tok.h
-x86_64_FILES = $(CORE_FILES) x86_64-gen.c x86_64-link.c i386-asm.c x86_64-asm.h
+x86_64_FILES = $(CORE_FILES) x86_64-gen.c x86_64-link.c x86_64-asm.c x86_64-asm.h
 arm64_FILES = $(CORE_FILES) arm64-gen.c arm64-link.c arm64-asm.c
 
 TCCDEFS_H$(subst yes,,$(CONFIG_predefs)) = tccdefs_.h
