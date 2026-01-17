@@ -66,7 +66,6 @@ DEF-arm64          = -DTCC_TARGET_ARM64
 DEF-arm64-FreeBSD  = $(DEF-arm64) -DTARGETOS_FreeBSD
 DEF-arm64-NetBSD   = $(DEF-arm64) -DTARGETOS_NetBSD
 DEF-arm64-OpenBSD  = $(DEF-arm64) -DTARGETOS_OpenBSD
-DEF-riscv64        = -DTCC_TARGET_RISCV64
 DEF-c67            = -DTCC_TARGET_C67 -w # disable warnigs
 DEF-x86_64-FreeBSD = $(DEF-x86_64) -DTARGETOS_FreeBSD
 DEF-x86_64-NetBSD  = $(DEF-x86_64) -DTARGETOS_NetBSD
@@ -84,7 +83,6 @@ all: $(PROGS) $(TCCLIBS) $(TCCDOCS)
 
 # cross compiler targets to build
 TCC_X = i386 x86_64 arm64 c67
-TCC_X += riscv64
 
 # cross libtcc1.a targets to build
 LIBTCC1_X = $(filter-out c67,$(TCC_X))
@@ -136,7 +134,6 @@ ifneq ($(T),$(NATIVE_TARGET))
 TRIPLET-i386 ?= i686-linux-gnu
 TRIPLET-x86_64 ?= x86_64-linux-gnu
 TRIPLET-arm64 ?= aarch64-linux-gnu
-TRIPLET-riscv64 ?= riscv64-linux-gnu
 MARCH-i386 ?= i386-linux-gnu
 MARCH-$T ?= $(TRIPLET-$T)
 TR = $(if $(TRIPLET-$T),$T,ignored)
@@ -151,7 +148,6 @@ i386_FILES = $(CORE_FILES) i386-gen.c i386-link.c i386-asm.c i386-asm.h i386-tok
 x86_64_FILES = $(CORE_FILES) x86_64-gen.c x86_64-link.c i386-asm.c x86_64-asm.h
 arm64_FILES = $(CORE_FILES) arm64-gen.c arm64-link.c arm64-asm.c
 c67_FILES = $(CORE_FILES) c67-gen.c c67-link.c tcccoff.c
-riscv64_FILES = $(CORE_FILES) riscv64-gen.c riscv64-link.c riscv64-asm.c
 
 TCCDEFS_H$(subst yes,,$(CONFIG_predefs)) = tccdefs_.h
 
