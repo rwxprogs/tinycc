@@ -61,12 +61,6 @@ LDFLAGS_P = $(LDFLAGS)
 
 DEF-x86_64         = -DTCC_TARGET_X86_64
 DEF-arm64          = -DTCC_TARGET_ARM64
-DEF-arm64-FreeBSD  = $(DEF-arm64) -DTARGETOS_FreeBSD
-DEF-arm64-NetBSD   = $(DEF-arm64) -DTARGETOS_NetBSD
-DEF-arm64-OpenBSD  = $(DEF-arm64) -DTARGETOS_OpenBSD
-DEF-x86_64-FreeBSD = $(DEF-x86_64) -DTARGETOS_FreeBSD
-DEF-x86_64-NetBSD  = $(DEF-x86_64) -DTARGETOS_NetBSD
-DEF-x86_64-OpenBSD = $(DEF-x86_64) -DTARGETOS_OpenBSD
 
 ifeq ($(INCLUDED),no)
 # --------------------------------------------------------------------------
