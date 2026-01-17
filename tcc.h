@@ -372,29 +372,13 @@ extern long double strtold (const char *__nptr, char **__endptr);
 /* include the target specific definitions */
 
 #define TARGET_DEFS_ONLY
-#ifdef TCC_TARGET_I386
-# include "i386-gen.c"
-# include "i386-link.c"
-#elif defined TCC_TARGET_X86_64
+#if defined TCC_TARGET_X86_64
 # include "x86_64-gen.c"
 # include "x86_64-link.c"
-#elif defined TCC_TARGET_ARM
-# include "arm-gen.c"
-# include "arm-link.c"
-# include "arm-asm.c"
 #elif defined TCC_TARGET_ARM64
 # include "arm64-gen.c"
 # include "arm64-link.c"
 # include "arm64-asm.c"
-#elif defined TCC_TARGET_C67
-# define TCC_TARGET_COFF
-# include "coff.h"
-# include "c67-gen.c"
-# include "c67-link.c"
-#elif defined(TCC_TARGET_RISCV64)
-# include "riscv64-gen.c"
-# include "riscv64-link.c"
-# include "riscv64-asm.c"
 #else
 #error unknown target
 #endif
