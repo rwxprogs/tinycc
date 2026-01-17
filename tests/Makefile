@@ -34,34 +34,8 @@ endif
 ifeq ($(CONFIG_dll),no)
  TESTS := $(filter-out dlltest, $(TESTS))
 endif
-ifeq (-$(CONFIG_arm_eabi)-$(CONFIG_arm_vfp)-,-yes--)
- TESTS := $(filter-out test3 test1b,$(TESTS))
-endif
 ifeq (,$(filter i386 x86_64,$(ARCH)))
  TESTS := $(filter-out asm-c-connect-test,$(TESTS))
-endif
-ifeq ($(OS),Windows_NT) # for libtcc_test to find libtcc.dll
- PATH := $(CURDIR)/$(TOP)$(if $(findstring ;,$(PATH)),;,:)$(PATH)
-endif
-ifdef CONFIG_OSX
-LIBS += $(LINK_LIBTCC)
-endif
-ifeq ($(ARCH),arm)
-# tcctest refers to the alignment of functions, and with thumb mode
-# the low bit of code addresses selects the mode, so the "alignment"
-# of functions via bit masking comes out as 1.  Just disable thumb.
-test.ref: CFLAGS+=-marm
-endif
-ifeq ($(ARCH)$(CONFIG_WIN32),i386)
-# tcctest.c:get_asm_string uses a construct that is checked too strictly
-# by GCC in 32bit mode when PIC is enabled.
-test.ref: CFLAGS+=-fno-PIC -fno-PIE -Wl,-z,notext
-endif
-ifeq ($(CC_NAME),msvc)
-test.ref abitest : CC = gcc
-endif
-ifeq ($(TARGETOS),OpenBSD)
-dlltest: CFLAGS+=-fno-stack-protector
 endif
 ifneq (,$(filter FreeBSD NetBSD,$(TARGETOS)))
   # test3 has dlsym problems
@@ -71,11 +45,7 @@ endif
 
 RUN_TCC = -run $(TOPSRC)/tcc.c $(TCCFLAGS)
 DISAS = objdump -d
-ifdef CONFIG_OSX
-DUMPTCC = (set -x; $(TOP)/tcc -vv; otool -L $(TOP)/tcc; exit 1)
-else
 DUMPTCC = (set -x; $(TOP)/tcc -vv; ldd $(TOP)/tcc; exit 1)
-endif
 
 all test :
 	@echo ------------ version ------------
@@ -295,26 +265,8 @@ cross-test : tcctest.c examples/ex3.c
 	$(foreach T,$(CROSS-TGTS),$(call CROSS-COMPILE,$T))
 
 CROSS-TGTS = \
- i386 \
- i386-win32 \
- i386-OpenBSD \
  x86_64 \
- x86_64-win32 \
- x86_64-osx \
- x86_64-FreeBSD \
- x86_64-NetBSD \
- x86_64-OpenBSD \
- arm-fpa \
- arm-eabihf \
- arm-NetBSD \
- arm-wince \
- arm64 \
- arm64-osx \
- arm64-FreeBSD \
- arm64-NetBSD \
- arm64-OpenBSD \
- riscv64 \
- c67
+ arm64
 
 define CROSS-COMPILE
  @echo " . $(1)"

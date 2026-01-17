@@ -31,13 +31,8 @@ struct sym_version {
 /* section is dynsymtab_section */
 #define SHF_DYNSYM 0x40000000
 
-#ifdef TCC_TARGET_PE
-#define shf_RELRO SHF_ALLOC
-static const char rdata[] = ".rdata";
-#else
 #define shf_RELRO SHF_ALLOC /* eventually made SHF_WRITE in sort_sections() */
 static const char rdata[] = ".data.ro";
-#endif
 
 /* ------------------------------------------------------------------------- */
 

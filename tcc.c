@@ -47,9 +47,6 @@ static const char help[] =
     "Debugger options:\n"
     "  -g           generate stab runtime debug info\n"
     "  -gdwarf[-x]  generate dwarf runtime debug info\n"
-#ifdef TCC_TARGET_PE
-    "  -g.pdb       create .pdb debug database\n"
-#endif
 #ifdef CONFIG_TCC_BCHECK
     "  -b           compile with built-in memory and bounds checker (implies -g)\n"
 #endif
@@ -63,14 +60,11 @@ static const char help[] =
     "  -M[M]D       generate make dependency file [ignore system files]\n"
     "  -M[M]        as above but no other output\n"
     "  -MF file     specify dependency file name\n"
-#if defined(TCC_TARGET_I386) || defined(TCC_TARGET_X86_64)
-    "  -m32/64      defer to i386/x86_64 cross compiler\n"
+#if defined(TCC_TARGET_X86_64)
+    "  -m64      defer to x86_64 cross compiler\n"
 #endif
     "Tools:\n"
     "  create library  : tcc -ar [crstvx] lib [files]\n"
-#ifdef TCC_TARGET_PE
-    "  create def file : tcc -impdef lib.dll [-v] [-o lib.def]\n"
-#endif
     "Discussion & bug reports:\n"
     "  https://lists.nongnu.org/mailman/listinfo/tinycc-devel\n"
     ;
@@ -112,9 +106,6 @@ static const char help2[] =
     "  test-coverage                 create code coverage code\n"
     "-m... target specific options:\n"
     "  ms-bitfields                  use MSVC bitfield layout\n"
-#ifdef TCC_TARGET_ARM
-    "  float-abi                     hard/softfp on arm\n"
-#endif
 #ifdef TCC_TARGET_X86_64
     "  no-sse                        disable floats on x86_64\n"
 #endif
@@ -125,70 +116,26 @@ static const char help2[] =
     "  -export-dynamic               same as -rdynamic\n"
     "  -image-base= -Ttext=          set base address of executable\n"
     "  -section-alignment=           set section alignment in executable\n"
-#ifdef TCC_TARGET_PE
-    "  -file-alignment=              set PE file alignment\n"
-    "  -stack=                       set PE stack reserve\n"
-    "  -large-address-aware          set related PE option\n"
-    "  -subsystem=[console/windows]  set PE subsystem\n"
-    "  -oformat=[pe-* binary]        set executable output format\n"
-    "Predefined macros:\n"
-    "  tcc -E -dM - < nul\n"
-#else
     "  -rpath=                       set dynamic library search path\n"
     "  -enable-new-dtags             set DT_RUNPATH instead of DT_RPATH\n"
     "  -soname=                      set DT_SONAME elf tag\n"
-#if defined(TCC_TARGET_MACHO)
-    "  -install_name=                set DT_SONAME elf tag (soname macOS alias)\n"
-#else
     "  -Ipath, -dynamic-linker=path  set ELF interpreter to path\n"
-#endif
     "  -Bsymbolic                    set DT_SYMBOLIC elf tag\n"
     "  -oformat=[elf32/64-* binary]  set executable output format\n"
     "  -init= -fini= -Map= -as-needed -O -z= (ignored)\n"
     "Predefined macros:\n"
     "  tcc -E -dM - < /dev/null\n"
-#endif
     "See also the manual for more details.\n"
     ;
 
 static const char version[] =
-    "tcc version "TCC_VERSION
-#ifdef TCC_GITHASH
-    " "TCC_GITHASH
-#endif
-    " ("
-#ifdef TCC_TARGET_I386
-        "i386"
-#elif defined TCC_TARGET_X86_64
+    "tcc version "TCC_VERSION" ("
+#if defined TCC_TARGET_X86_64
         "x86_64"
-#elif defined TCC_TARGET_C67
-        "C67"
-#elif defined TCC_TARGET_ARM
-        "ARM"
-# ifdef TCC_ARM_EABI
-        " eabi"
-#  ifdef TCC_ARM_HARDFLOAT
-        "hf"
-#  endif
-# endif
 #elif defined TCC_TARGET_ARM64
         "AArch64"
-#elif defined TCC_TARGET_RISCV64
-        "riscv64"
 #endif
-#ifdef TCC_TARGET_PE
-        " Windows"
-#elif defined(TCC_TARGET_MACHO)
-        " Darwin"
-#elif TARGETOS_FreeBSD || TARGETOS_FreeBSD_kernel
-        " FreeBSD"
-#elif TARGETOS_OpenBSD
-        " OpenBSD"
-#elif TARGETOS_NetBSD
-        " NetBSD"
-#else
         " Linux"
-#endif
     ")\n"
     ;
 
@@ -295,10 +242,7 @@ redo:
 
         if (opt == OPT_AR)
             ret = tcc_tool_ar(argc, argv);
-#ifdef TCC_TARGET_PE
-        if (opt == OPT_IMPDEF)
-            ret = tcc_tool_impdef(argc, argv);
-#endif
+
         if (opt == OPT_PRINT_DIRS) {
             /* initialize search dirs */
             set_environment(s);
@@ -337,14 +281,10 @@ redo:
     tcc_set_output_type(s, s->output_type);
     s->ppfp = ppfp;
 
-    if ((s->output_type == TCC_OUTPUT_MEMORY
-      || s->output_type == TCC_OUTPUT_PREPROCESS)
-        && (s->dflag & 16)) { /* -dt option */
-        if (t)
-            s->dflag |= 32;
+    if ((s->output_type == TCC_OUTPUT_MEMORY || s->output_type == TCC_OUTPUT_PREPROCESS) && (s->dflag & 16)) { /* -dt option */
+        if (t) s->dflag |= 32;
         s->run_test = ++t;
-        if (n)
-            --n;
+        if (n) --n;
     }
 
     /* compile or add each files or library */
@@ -388,21 +328,23 @@ redo:
     }
 
     done = 1;
-    if (t)
+    if (t) {
         done = 0; /* run more tests with -dt -run */
-    else if (ret) {
-        if (s->nb_errors)
-            ret = 1;
+    } else if (ret) {
+        if (s->nb_errors) ret = 1;
         /* else keep the original exit code from tcc_run() */
-    } else if (n < s->nb_files)
+    } else if (n < s->nb_files) {
         done = 0; /* compile more files with -c */
-    else if (s->do_bench)
+    } else if (s->do_bench) {
         tcc_print_stats(s, end_time - start_time);
+    }
 
     tcc_delete(s);
     if (!done)
         goto redo;
+    
     if (ppfp && ppfp != stdout)
         fclose(ppfp);
+        
     return ret;
 }

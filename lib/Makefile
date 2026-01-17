@@ -4,7 +4,7 @@
 
 TOP = ..
 include $(TOP)/Makefile
-VPATH = $(TOPSRC)/lib $(TOPSRC)/win32/lib
+VPATH = $(TOPSRC)/lib
 T = $(or $(CROSS_TARGET),$(NATIVE_TARGET),unknown)
 X = $(if $(CROSS_TARGET),$(CROSS_TARGET)-)
 XCFG = $(or $(findstring -win,$T),-unx)
@@ -15,7 +15,6 @@ XTCC ?= $(TOP)/$(X)tcc$(EXESUF)
 XCC = $(XTCC)
 XAR = $(XTCC) -ar
 XFLAGS-unx = -B$(TOPSRC)
-XFLAGS-win = -B$(TOPSRC)/win32 -I$(TOPSRC)/include
 XFLAGS = $(XFLAGS$(XCFG))
 BFLAGS = -bt
 
@@ -24,7 +23,6 @@ arm-libtcc1-usegcc ?= no
 
 # This makes bounds checking 40%..60% faster.
 #x86_64-libtcc1-usegcc=yes
-#i386-libtcc1-usegcc=yes
 
 ifeq "$($(T)-libtcc1-usegcc)" "yes"
  XCC = $(CC)
@@ -35,15 +33,10 @@ endif
 
 XFLAGS += -I$(TOP)
 
-I386_O = libtcc1.o $(COMMON_O)
 X86_64_O = libtcc1.o $(COMMON_O)
-ARM_O = libtcc1.o armeabi.o armflush.o $(COMMON_O)
 ARM64_O = lib-arm64.o $(COMMON_O)
-RISCV64_O = lib-arm64.o $(COMMON_O)
 COMMON_O = stdatomic.o atomic.o builtin.o alloca.o alloca-bt.o
-WIN_O = crt1.o crt1w.o wincrt1.o wincrt1w.o dllcrt1.o dllmain.o
 LIN_O = dsohandle.o
-OSX_O =
 
 # backtrace/bcheck/run only for native compiler
 Nat = $(if $X,no,)
@@ -58,21 +51,8 @@ $(Cbc)COMMON_O += bcheck.o
 # not in libtcc1.a
 EXTRA_O = runmain.o bt-exe.o bt-dll.o bt-log.o bcheck.o
 
-OBJ-i386 = $(I386_O) pic86.o $(LIN_O)
 OBJ-x86_64 = $(X86_64_O) $(LIN_O)
-OBJ-x86_64-osx = $(X86_64_O) $(OSX_O)
-OBJ-i386-win32 = $(I386_O) chkstk.o $(WIN_O)
-OBJ-x86_64-win32 = $(X86_64_O) chkstk.o $(WIN_O)
 OBJ-arm64 = $(ARM64_O) $(LIN_O)
-OBJ-arm64-osx = $(ARM64_O) $(OSX_O)
-OBJ-arm = $(ARM_O) $(LIN_O)
-OBJ-arm-fpa = $(OBJ-arm)
-OBJ-arm-fpa-ld = $(OBJ-arm)
-OBJ-arm-vfp = $(OBJ-arm)
-OBJ-arm-eabi = $(OBJ-arm)
-OBJ-arm-eabihf = $(OBJ-arm)
-OBJ-arm-wince = $(ARM_O) $(WIN_O)
-OBJ-riscv64 = $(RISCV64_O) $(LIN_O)
 
 OBJ-extra = $(filter $(EXTRA_O),$(OBJ-$T))
 OBJ-libtcc1 = $(addprefix $(X),$(filter-out $(OBJ-extra),$(OBJ-$T)))

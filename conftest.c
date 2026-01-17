@@ -162,39 +162,21 @@ int main(int argc, char **argv)
 #include <stdio.h>
 
 /* Define architecture */
-#if defined(__i386__) || defined _M_IX86
-# define TRIPLET_ARCH "i386"
-#elif defined(__x86_64__) || defined _M_AMD64
+#if defined(__x86_64__) || defined _M_AMD64
 # define TRIPLET_ARCH "x86_64"
-#elif defined(__arm__)
-# define TRIPLET_ARCH "arm"
 #elif defined(__aarch64__)
 # define TRIPLET_ARCH "aarch64"
-#elif defined(__riscv) && defined(__LP64__)
-# define TRIPLET_ARCH "riscv64"
 #else
 # define TRIPLET_ARCH "unknown"
 #endif
 
 /* Define OS */
-#if defined (__linux__)
-# define TRIPLET_OS "linux"
-#elif !defined (__GNU__)
-# define TRIPLET_OS "unknown"
-#endif
+#define TRIPLET_OS "linux"
 
 #define ABI_PREFIX "gnu"
 
 /* Define calling convention and ABI */
-#if defined (__ARM_EABI__)
-# if defined (__ARM_PCS_VFP)
-#  define TRIPLET_ABI ABI_PREFIX"eabihf"
-# else
-#  define TRIPLET_ABI ABI_PREFIX"eabi"
-# endif
-#else
-# define TRIPLET_ABI ABI_PREFIX
-#endif
+#define TRIPLET_ABI ABI_PREFIX
 
 #if defined __GNU__
 # define TRIPLET TRIPLET_ARCH "-" TRIPLET_ABI
@@ -225,13 +207,6 @@ int main(int argc, char *argv[])
         case 'm'://inor
             printf("%d\n", __TINYC__);
             break;
-#elif defined(_MSC_VER)
-        case 'v'://ersion
-            puts("0");
-            break;
-        case 'm'://inor
-            printf("%d\n", _MSC_VER);
-            break;
 #elif defined(__GNUC__) && defined(__GNUC_MINOR__)
         /* GNU comes last as other compilers may add 'GNU' compatibility */
         case 'm'://inor
@@ -254,8 +229,6 @@ int main(int argc, char *argv[])
             puts("clang");
 #elif defined(__TINYC__)
             puts("tcc");
-#elif defined(_MSC_VER)
-            puts("msvc");
 #elif defined(__GNUC__)
             puts("gcc");
 #else

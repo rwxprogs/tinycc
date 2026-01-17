@@ -307,9 +307,6 @@ ST_FUNC void relocate(TCCState *s1, ElfW_Rel *rel, int type, unsigned char *ptr,
             write64le(ptr, val - rel->r_addend);
             return;
         case R_AARCH64_RELATIVE:
-#ifdef TCC_TARGET_PE
-            add32le(ptr, val - s1->pe_imagebase);
-#endif
             /* do nothing */
             return;
         default:

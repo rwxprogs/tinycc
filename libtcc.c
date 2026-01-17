@@ -24,12 +24,6 @@
 #else
 #error unknown target
 #endif
-#ifdef TCC_TARGET_PE
-#include "tccpe.c"
-#endif
-#ifdef TCC_TARGET_MACHO
-#include "tccmacho.c"
-#endif
 #endif /* ONE_SOURCE */
 
 #include "tcc.h"

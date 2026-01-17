@@ -71,12 +71,8 @@ extern long double strtold (const char *__nptr, char **__endptr);
 /* #define ASM_DEBUG */
 
 /* target selection */
-/* #define TCC_TARGET_I386   *//* i386 code generator */
 /* #define TCC_TARGET_X86_64 *//* x86-64 code generator */
-/* #define TCC_TARGET_ARM    *//* ARMv4 code generator */
 /* #define TCC_TARGET_ARM64  *//* ARMv8 code generator */
-/* #define TCC_TARGET_C67    *//* TMS320C67xx code generator */
-/* #define TCC_TARGET_RISCV64 *//* risc-v code generator */
 
 /* only native compiler supports -run */
 #define TCC_IS_NATIVE
@@ -309,11 +305,7 @@ typedef struct TokenSym {
     char str[1];
 } TokenSym;
 
-#ifdef TCC_TARGET_PE
-typedef unsigned short nwchar_t;
-#else
 typedef int nwchar_t;
-#endif
 
 typedef struct CString {
     int size; /* size in bytes */
@@ -657,16 +649,10 @@ struct TCCState {
 #ifdef TCC_TARGET_X86_64
     unsigned char nosse; /* For -mno-sse support. */
 #endif
-#ifdef TCC_TARGET_ARM
-    unsigned char float_abi; /* float ABI of the generated code*/
-#endif
 
     unsigned char has_text_addr;
     addr_t text_addr; /* address of text section */
     unsigned section_align; /* section alignment */
-#ifdef TCC_TARGET_I386
-    int seg_size; /* 32. Can be 16 with i386 assembler (.code16) */
-#endif
 
     char *tcc_lib_path; /* CONFIG_TCCDIR or -B option */
     char *soname; /* as specified on the command line (-soname) */
@@ -794,31 +780,6 @@ struct TCCState {
     ElfW_Rel *qrel;
     #define qrel s1->qrel
 
-#ifdef TCC_TARGET_RISCV64
-    struct pcrel_hi { addr_t addr, val; } last_hi;
-    #define last_hi s1->last_hi
-#endif
-
-#ifdef TCC_TARGET_PE
-    /* PE info */
-    int pe_subsystem;
-    unsigned pe_characteristics;
-    unsigned pe_file_align;
-    unsigned pe_stack_size;
-    addr_t pe_imagebase;
-# ifdef TCC_TARGET_X86_64
-    Section *uw_pdata;
-    int uw_sym;
-    unsigned uw_offs;
-# endif
-#endif
-
-#if defined TCC_TARGET_MACHO
-    char *install_name;
-    uint32_t compatibility_version;
-    uint32_t current_version;
-#endif
-
 #ifndef ELF_OBJ_ONLY
     int nb_sym_versions;
     struct sym_version *sym_versions;
@@ -834,9 +795,6 @@ struct TCCState {
     void *run_ptr; /* runtime_memory */
     unsigned run_size; /* size of runtime_memory  */
     const char *run_stdin; /* custom stdin file for run_main */
-#ifdef _WIN64
-    void *run_function_table; /* unwind data */
-#endif
     struct TCCState *next;
     struct rt_context *rc; /* pointer to backtrace info block */
     void *run_lj, *run_jb; /* sj/lj for tcc_setjmp()/tcc_run() */
@@ -1340,9 +1298,6 @@ ST_FUNC void vpop(void);
 #if PTR_SIZE == 4
 ST_FUNC void lexpand(void);
 #endif
-#ifdef TCC_TARGET_ARM
-ST_FUNC int get_reg_ex(int rc, int rc2);
-#endif
 ST_FUNC void save_reg(int r);
 ST_FUNC void save_reg_upstack(int r, int n);
 ST_FUNC int get_reg(int rc);
@@ -1439,13 +1394,10 @@ ST_FUNC int tcc_load_ldscript(TCCState *s1, int fd);
 ST_FUNC void tccelf_add_crtbegin(TCCState *s1);
 ST_FUNC void tccelf_add_crtend(TCCState *s1);
 #endif
-#ifndef TCC_TARGET_PE
 ST_FUNC void tcc_add_runtime(TCCState *s1);
-#endif
 
 /* ------------ xxx-link.c ------------ */
 
-#ifndef TCC_TARGET_PE
 ST_FUNC int code_reloc (int reloc_type);
 ST_FUNC int gotplt_entry_type (int reloc_type);
 /* Whether to generate a GOT/PLT entry and when. NO_GOTPLT_ENTRY is first so
@@ -1463,7 +1415,7 @@ ST_FUNC void relocate_plt(TCCState *s1);
 ST_FUNC void build_got_entries(TCCState *s1, int got_sym); /* in tccelf.c */
 #define NEED_BUILD_GOT
 #endif
-#endif
+
 
 ST_FUNC void relocate(TCCState *s1, ElfW_Rel *rel, int type, unsigned char *ptr, addr_t addr, addr_t val);
 
@@ -1490,9 +1442,7 @@ ST_FUNC void gen_cvt_ftoi(int t);
 ST_FUNC void gen_cvt_itof(int t);
 ST_FUNC void gen_cvt_ftof(int t);
 ST_FUNC void ggoto(void);
-#ifndef TCC_TARGET_C67
 ST_FUNC void o(unsigned int c);
-#endif
 ST_FUNC void gen_vla_sp_save(int addr);
 ST_FUNC void gen_vla_sp_restore(int addr);
 ST_FUNC void gen_vla_alloc(CType *type, int align);
@@ -1521,37 +1471,20 @@ static inline void write64le(unsigned char *p, uint64_t x) {
 static inline void add64le(unsigned char *p, int64_t x) {
     write64le(p, read64le(p) + x);
 }
-/* ------------ i386-gen.c ------------ */
-#if defined TCC_TARGET_I386 || defined TCC_TARGET_X86_64 || defined TCC_TARGET_ARM
+
+/* ------------ x86_64-gen.c ------------ */
+#ifdef TCC_TARGET_X86_64
 ST_FUNC void g(int c);
 ST_FUNC void gen_le16(int c);
 ST_FUNC void gen_le32(int c);
-#endif
-#if defined TCC_TARGET_I386 || defined TCC_TARGET_X86_64
 ST_FUNC void gen_addr32(int r, Sym *sym, int c);
 ST_FUNC void gen_addrpc32(int r, Sym *sym, int c);
 ST_FUNC void gen_cvt_csti(int t);
 ST_FUNC void gen_increment_tcov (SValue *sv);
-#endif
-
-/* ------------ x86_64-gen.c ------------ */
-#ifdef TCC_TARGET_X86_64
 ST_FUNC void gen_addr64(int r, Sym *sym, int64_t c);
 ST_FUNC void gen_opl(int op);
-#ifdef TCC_TARGET_PE
-ST_FUNC void gen_vla_result(int addr);
-#endif
 ST_FUNC void gen_cvt_sxtw(void);
 ST_FUNC void gen_cvt_csti(int t);
-#endif
-
-/* ------------ arm-gen.c ------------ */
-#ifdef TCC_TARGET_ARM
-#if defined(TCC_ARM_EABI) && !defined(CONFIG_TCC_ELFINTERP)
-PUB_FUNC const char *default_elfinterp(struct TCCState *s);
-#endif
-ST_FUNC void arm_init(struct TCCState *s);
-ST_FUNC void gen_increment_tcov (SValue *sv);
 #endif
 
 /* ------------ arm64-gen.c ------------ */
@@ -1564,26 +1497,6 @@ ST_FUNC void gen_clear_cache(void);
 ST_FUNC void gen_cvt_sxtw(void);
 ST_FUNC void gen_cvt_csti(int t);
 ST_FUNC void gen_increment_tcov (SValue *sv);
-#endif
-
-/* ------------ riscv64-gen.c ------------ */
-#ifdef TCC_TARGET_RISCV64
-ST_FUNC void gen_opl(int op);
-//ST_FUNC void gfunc_return(CType *func_type);
-ST_FUNC void gen_va_start(void);
-ST_FUNC void arch_transfer_ret_regs(int);
-ST_FUNC void gen_cvt_sxtw(void);
-ST_FUNC void gen_increment_tcov (SValue *sv);
-#endif
-
-/* ------------ c67-gen.c ------------ */
-#ifdef TCC_TARGET_C67
-#endif
-
-/* ------------ tcccoff.c ------------ */
-#ifdef TCC_TARGET_COFF
-ST_FUNC int tcc_output_coff(TCCState *s1, FILE *f);
-ST_FUNC int tcc_load_coff(TCCState * s1, int fd);
 #endif
 
 /* ------------ tccasm.c ------------ */
@@ -1609,34 +1522,8 @@ ST_FUNC void asm_clobber(uint8_t *clobber_regs, const char *str);
 #endif
 
 /* ------------ tccpe.c -------------- */
-#ifdef TCC_TARGET_PE
-ST_FUNC int pe_load_file(struct TCCState *s1, int fd, const char *filename);
-ST_FUNC int pe_output_file(TCCState * s1, const char *filename);
-ST_FUNC int pe_putimport(TCCState *s1, int dllindex, const char *name, addr_t value);
-ST_FUNC int pe_setsubsy(TCCState *s1, const char *arg);
-#if defined TCC_TARGET_I386 || defined TCC_TARGET_X86_64
-#endif
-#ifdef TCC_TARGET_X86_64
-ST_FUNC void pe_add_unwind_data(unsigned start, unsigned end, unsigned stack);
-#endif
-PUB_FUNC int tcc_get_dllexports(const char *filename, char **pp);
-/* symbol properties stored in Elf32_Sym->st_other */
-# define ST_PE_EXPORT 0x10
-# define ST_PE_IMPORT 0x20
-# define ST_PE_STDCALL 0x40
-#endif
 #define ST_ASM_SET 0x04
 
-/* ------------ tccmacho.c ----------------- */
-#ifdef TCC_TARGET_MACHO
-ST_FUNC int macho_output_file(TCCState * s1, const char *filename);
-ST_FUNC int macho_load_dll(TCCState *s1, int fd, const char *filename, int lev);
-ST_FUNC int macho_load_tbd(TCCState *s1, int fd, const char *filename, int lev);
-#ifdef TCC_IS_NATIVE
-ST_FUNC void tcc_add_macos_sdkpath(TCCState* s);
-ST_FUNC char* macho_tbd_soname(int fd);
-#endif
-#endif
 /* ------------ tccrun.c ----------------- */
 #ifdef TCC_IS_NATIVE
 #ifdef CONFIG_TCC_STATIC
@@ -1753,11 +1640,7 @@ dwarf_read_sleb128(unsigned char **ln, unsigned char *end)
 }
 
 /* default dwarf version for "-gdwarf" */
-#ifdef TCC_TARGET_MACHO
-# define DEFAULT_DWARF_VERSION 2
-#else
-# define DEFAULT_DWARF_VERSION 5
-#endif
+#define DEFAULT_DWARF_VERSION 5
 
 /* default dwarf version for "-g". use 0 to emit stab debug infos */
 #ifndef CONFIG_DWARF_VERSION
